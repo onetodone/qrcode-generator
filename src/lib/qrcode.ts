@@ -17,10 +17,14 @@ const DOMAIN_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i
 
 const emailSchema = z.email()
 
+// Schemes we're willing to redirect a scanner to. `new URL()` alone accepts
+// anything parseable, including `javascript:`/`data:`/`file:`, which would
+// otherwise flow straight into the redirect at src/app/s/[hash]/route.ts.
+const ALLOWED_URI_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
+
 export function isValidUri(value: string): boolean {
   try {
-    new URL(value)
-    return true
+    return ALLOWED_URI_SCHEMES.has(new URL(value).protocol)
   } catch {
     return false
   }

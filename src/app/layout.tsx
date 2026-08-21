@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
       follow: true,
     },
     openGraph: {
-      title: 'QR Code',
+      title: 'QR Code OneToDone',
       description: 'Internal QR code generator and tracker.',
       type: 'website',
     },
