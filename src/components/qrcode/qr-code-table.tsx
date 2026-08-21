@@ -15,12 +15,14 @@ export function QrCodeTable({ qrCodes }: { qrCodes: QrCodeRowData[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>QR Code</TableHead>
-            <TableHead>Scanned</TableHead>
+            <TableHead className="w-[80px]">QR Code</TableHead>
+            <TableHead className="w-[80px]">Scanned</TableHead>
             <TableHead>Leads to</TableHead>
-            <TableHead>Note</TableHead>
-            <TableHead>Downloads</TableHead>
-            <TableHead className="sr-only">Actions</TableHead>
+            <TableHead className="min-w-[200px]">Note</TableHead>
+            <TableHead className="w-[120px]">Downloads</TableHead>
+            <TableHead className="w-[90px]">
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
