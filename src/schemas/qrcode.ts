@@ -4,12 +4,12 @@ export const qrCodeFormSchema = z.object({
   leadsTo: z
     .string()
     .min(1, { error: 'Endpoint is required.' })
-    .max(150, { error: 'Endpoint must be at most 150 characters.' })
+    .max(200, { error: 'Endpoint must be at most 200 characters.' })
     .trim(),
-  location: z
+  note: z
     .string()
-    .min(1, { error: 'Distribution point is required.' })
-    .max(50, { error: 'Distribution point must be at most 50 characters.' })
+    .min(1, { error: 'Note is required.' })
+    .max(200, { error: 'Note must be at most 200 characters.' })
     .trim(),
 })
 

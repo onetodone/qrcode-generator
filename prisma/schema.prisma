@@ -56,7 +56,7 @@ model QrCode {
   id        String   @id @default(cuid())
   userId    String
   urlHash   String   @unique @db.VarChar(32)
-  location  String
+  note      String
   leadsTo   String
   views     Int      @default(0)
   createdAt DateTime @default(now())
