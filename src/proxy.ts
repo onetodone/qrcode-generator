@@ -18,6 +18,11 @@ export default auth((req) => {
 })
 
 export const config = {
-  // Skip the public /s/[hash] redirect route, the auth API, and static assets.
-  matcher: ['/((?!api|s/|_next/static|_next/image|favicon.ico).*)'],
+  // Skip the public /s/[hash] redirect route, the auth API, static assets, and
+  // the metadata file-convention routes (favicon/icon/apple-icon/manifest/OG
+  // image) — these must stay reachable pre-login for browsers, PWA installers,
+  // and link-preview crawlers.
+  matcher: [
+    '/((?!api|s/|_next/static|_next/image|favicon\\.ico|icon\\.(?:svg|png)|apple-icon\\.png|opengraph-image\\.jpg|manifest\\.json|web-app-manifest-.*\\.png).*)',
+  ],
 }
