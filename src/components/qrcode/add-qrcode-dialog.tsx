@@ -14,7 +14,7 @@ export function AddQrCodeDialog() {
         </>
       }
       title="Add QR Code"
-      description="Create a new tracked QR code for a distribution point."
+      description="Create a new tracked QR code."
       submitLabel="Add QR Code"
       pendingLabel="Adding..."
       successMessage="QR code created."

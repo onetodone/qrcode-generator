@@ -25,7 +25,7 @@ const DOWNLOAD_SIZE = 1024
 export type QrCodeRowData = {
   id: string
   urlHash: string
-  location: string
+  note: string
   leadsTo: string
   views: number
   redirectUrl: string
@@ -82,12 +82,12 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
         </div>
       </TableCell>
       <TableCell>{qrCode.views}</TableCell>
-      <TableCell className="max-w-48 whitespace-normal break-words">{qrCode.location}</TableCell>
       <TableCell className="max-w-64 whitespace-normal break-words">
         <a href={qrCode.leadsTo} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">
           {qrCode.leadsTo}
         </a>
       </TableCell>
+      <TableCell className="max-w-48 whitespace-normal break-words">{qrCode.note}</TableCell>
       <TableCell>
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={handleDownloadSvg}>
@@ -109,7 +109,7 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
             pendingLabel="Saving..."
             successMessage="QR code updated."
             action={updateQrCodeAction}
-            defaultValues={{ leadsTo: qrCode.leadsTo, location: qrCode.location }}
+            defaultValues={{ leadsTo: qrCode.leadsTo, note: qrCode.note }}
             hiddenId={qrCode.id}
           />
           <AlertDialog>
@@ -120,8 +120,8 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete this QR code?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This permanently removes the code for &ldquo;{qrCode.location}&rdquo;. Anyone who scans it afterwards
-                  will get a 404. This can&rsquo;t be undone.
+                  This permanently removes the code for &ldquo;{qrCode.note}&rdquo;. Anyone who scans it afterwards will
+                  get a 404. This can&rsquo;t be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

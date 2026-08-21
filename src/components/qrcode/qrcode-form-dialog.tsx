@@ -38,7 +38,7 @@ export function QrCodeFormDialog({
   pendingLabel: string
   successMessage: string
   action: QrCodeFormAction
-  defaultValues?: { leadsTo?: string; location?: string }
+  defaultValues?: { leadsTo?: string; note?: string }
   hiddenId?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -47,7 +47,7 @@ export function QrCodeFormDialog({
   // error (Add) or revert it to the pre-edit value (Edit). Only resynced from
   // `defaultValues` at the moment the dialog opens.
   const [leadsTo, setLeadsTo] = useState(defaultValues?.leadsTo ?? '')
-  const [location, setLocation] = useState(defaultValues?.location ?? '')
+  const [note, setNote] = useState(defaultValues?.note ?? '')
   const formId = useId()
   const [state, formAction, pending] = useActionState<QrCodeFormState, FormData>(action, undefined)
 
@@ -73,7 +73,7 @@ export function QrCodeFormDialog({
   function handleOpenChange(next: boolean) {
     if (next) {
       setLeadsTo(defaultValues?.leadsTo ?? '')
-      setLocation(defaultValues?.location ?? '')
+      setNote(defaultValues?.note ?? '')
     }
     setOpen(next)
   }
@@ -96,7 +96,7 @@ export function QrCodeFormDialog({
                   id={`${formId}-leadsTo`}
                   name="leadsTo"
                   placeholder="https://example.com"
-                  maxLength={150}
+                  maxLength={200}
                   value={leadsTo}
                   onChange={(event) => setLeadsTo(event.target.value)}
                   required
@@ -105,15 +105,15 @@ export function QrCodeFormDialog({
               </FieldContent>
             </Field>
             <Field>
-              <FieldLabel htmlFor={`${formId}-location`}>Distribution point</FieldLabel>
+              <FieldLabel htmlFor={`${formId}-note`}>Note</FieldLabel>
               <FieldContent>
                 <Input
-                  id={`${formId}-location`}
-                  name="location"
-                  placeholder="Wine Connection (Porto de Phuket)"
-                  maxLength={50}
-                  value={location}
-                  onChange={(event) => setLocation(event.target.value)}
+                  id={`${formId}-note`}
+                  name="note"
+                  placeholder="For some restaraunt"
+                  maxLength={200}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
                   required
                 />
               </FieldContent>

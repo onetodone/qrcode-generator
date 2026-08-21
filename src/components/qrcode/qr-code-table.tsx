@@ -17,8 +17,8 @@ export function QrCodeTable({ qrCodes }: { qrCodes: QrCodeRowData[] }) {
           <TableRow>
             <TableHead>QR Code</TableHead>
             <TableHead>Scanned</TableHead>
-            <TableHead>Distribution point</TableHead>
             <TableHead>Leads to</TableHead>
+            <TableHead>Note</TableHead>
             <TableHead>Downloads</TableHead>
             <TableHead className="sr-only">Actions</TableHead>
           </TableRow>
