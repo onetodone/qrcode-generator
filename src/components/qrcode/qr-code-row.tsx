@@ -5,9 +5,9 @@ import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react'
 import { PencilIcon, Trash2Icon } from 'lucide-react'
 import { TableCell, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -127,9 +127,9 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <form action={deleteQrCodeAction.bind(null, qrCode.id)} className="contents">
-                  <AlertDialogAction type="submit" variant="destructive">
+                  <SubmitButton data-slot="alert-dialog-action" variant="destructive" pendingLabel="Deleting...">
                     Delete
-                  </AlertDialogAction>
+                  </SubmitButton>
                 </form>
               </AlertDialogFooter>
             </AlertDialogContent>
