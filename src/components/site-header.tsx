@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { logoutAction } from '@/actions/auth'
 
 export function SiteHeader({ userName }: { userName?: string | null }) {
@@ -18,9 +19,9 @@ export function SiteHeader({ userName }: { userName?: string | null }) {
           </Button>
           {userName && <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>}
           <form action={logoutAction}>
-            <Button type="submit" variant="outline">
+            <SubmitButton variant="outline" pendingLabel="Signing out...">
               Sign out
-            </Button>
+            </SubmitButton>
           </form>
         </nav>
       </div>
