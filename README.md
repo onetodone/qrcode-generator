@@ -31,7 +31,7 @@ one is deployed.
 
 ### Prerequisites
 
-- Node.js 22.13+ (required by the pinned pnpm version below)
+- Node.js 26+
 - [pnpm](https://pnpm.io) (version is pinned via `packageManager`; run
   `corepack enable` to have the right version picked up automatically)
 - A PostgreSQL database (local or hosted)

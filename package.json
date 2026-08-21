@@ -1,6 +1,6 @@
 {
   "name": "qrcode-generator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "QR code generator with scan tracking — create QR codes, redirect scans through a short link, and see view counts per code.",
   "private": true,
   "author": "Anton Holubeu (https://github.com/aholu)",
@@ -55,7 +55,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^26",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -67,7 +67,7 @@
     "prisma": "^7.9.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^6.0.3"
   },
-  "packageManager": "pnpm@11.17.0"
+  "packageManager": "pnpm@11.22.0"
 }
