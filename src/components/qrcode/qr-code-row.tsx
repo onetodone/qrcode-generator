@@ -126,7 +126,7 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <form action={deleteQrCodeAction.bind(null, qrCode.id)}>
+                <form action={deleteQrCodeAction.bind(null, qrCode.id)} className="contents">
                   <AlertDialogAction type="submit" variant="destructive">
                     Delete
                   </AlertDialogAction>

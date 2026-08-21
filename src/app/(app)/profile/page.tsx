@@ -5,7 +5,7 @@ import { ProfileForm } from './profile-form'
 import { ChangePasswordForm } from './change-password-form'
 
 export const metadata: Metadata = {
-  title: 'Profile — QR Codes',
+  title: 'Profile',
 }
 
 export default async function ProfilePage() {

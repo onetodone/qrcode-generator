@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { RegisterForm } from './register-form'
 
 export const metadata: Metadata = {
-  title: 'Register — QR Codes',
+  title: 'Register',
 }
 
 export default function RegisterPage() {
