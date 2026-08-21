@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const session = await auth()
+  // Independent reads, fetched together rather than sequentially — the
+  // request headers don't depend on the session.
+  const [session, requestHeaders] = await Promise.all([auth(), headers()])
   if (!session?.user?.id) {
     redirect('/login')
   }
@@ -25,7 +27,6 @@ export default async function DashboardPage() {
   // redirect links are correct whether hit directly (localhost:PORT) or
   // through a reverse proxy on a public domain, without needing to keep an
   // APP_URL setting in sync with the actual deployment.
-  const requestHeaders = await headers()
   const proto = requestHeaders.get('x-forwarded-proto') ?? 'http'
   const host = requestHeaders.get('host')
   const appUrl = `${proto}://${host}`
