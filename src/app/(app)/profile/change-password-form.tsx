@@ -93,7 +93,7 @@ export function ChangePasswordForm() {
               </Field>
             </div>
             {state?.error && <FieldError>{state.error}</FieldError>}
-            <Button type="submit" disabled={pending} className="self-start">
+            <Button type="submit" disabled={pending} className="self-end">
               {pending ? 'Changing...' : 'Change password'}
             </Button>
           </FieldGroup>
