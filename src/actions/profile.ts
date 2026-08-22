@@ -2,8 +2,9 @@
 
 import bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
-import { auth, unstable_update } from '@/auth'
+import { auth, signOut, unstable_update } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { sendVerificationEmail } from '@/lib/verification'
 import { changePasswordSchema, updateProfileSchema } from '@/schemas/profile'
 
 export type ProfileFormState = { error?: string; success?: boolean } | undefined
@@ -23,6 +24,9 @@ export async function updateProfileAction(_prevState: ProfileFormState, formData
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input.' }
   }
 
+  const currentUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { email: true } })
+  const emailChanged = currentUser?.email !== parsed.data.email
+
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } })
   if (existing && existing.id !== session.user.id) {
     return { error: 'An account with this email already exists.' }
@@ -30,8 +34,17 @@ export async function updateProfileAction(_prevState: ProfileFormState, formData
 
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { name: parsed.data.name, email: parsed.data.email },
+    data: {
+      name: parsed.data.name,
+      email: parsed.data.email,
+      ...(emailChanged ? { emailVerified: null } : {}),
+    },
   })
+
+  if (emailChanged) {
+    await sendVerificationEmail(parsed.data.email)
+    await signOut({ redirectTo: `/verify-email?email=${encodeURIComponent(parsed.data.email)}` })
+  }
 
   // Keep the JWT session in sync, otherwise the old name/email would linger
   // in the session cookie until the next login.

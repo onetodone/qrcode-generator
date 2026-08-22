@@ -2,7 +2,7 @@ import type { Attachment } from 'nodemailer/lib/mailer'
 import { getSmtpConfig } from './config'
 import { minifyHtml } from './minify'
 import { renderEmailTemplate } from './template'
-import { transporter } from './transporter'
+import { getTransporter } from './transporter'
 
 export type EmailAttachment = Attachment
 
@@ -30,7 +30,7 @@ export async function sendEmail({
   const html = minifyHtml(renderEmailTemplate({ content, preheader, footerText }))
 
   try {
-    await transporter.sendMail({
+    await getTransporter().sendMail({
       from: getSmtpConfig().from,
       to,
       cc: toCC.length ? toCC : undefined,
