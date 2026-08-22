@@ -8,7 +8,6 @@ export const qrCodeFormSchema = z.object({
     .trim(),
   note: z
     .string()
-    .min(1, { error: 'Note is required.' })
     .max(200, { error: 'Note must be at most 200 characters.' })
     .trim(),
 })

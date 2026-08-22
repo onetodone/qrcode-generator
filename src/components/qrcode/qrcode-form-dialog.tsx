@@ -105,7 +105,7 @@ export function QrCodeFormDialog({
               </FieldContent>
             </Field>
             <Field>
-              <FieldLabel htmlFor={`${formId}-note`}>Note</FieldLabel>
+              <FieldLabel htmlFor={`${formId}-note`}>Note (optional)</FieldLabel>
               <FieldContent>
                 <Input
                   id={`${formId}-note`}
@@ -114,7 +114,6 @@ export function QrCodeFormDialog({
                   maxLength={200}
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
-                  required
                 />
               </FieldContent>
             </Field>
