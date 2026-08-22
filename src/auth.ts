@@ -2,6 +2,7 @@ import NextAuth, { CredentialsSignin } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
+import { Prisma, VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { loginSchema } from '@/schemas/auth'
@@ -25,17 +26,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   // Credentials-based auth only supports JWT sessions, not database sessions.
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
-  // The app is meant to run behind a reverse proxy on whatever host it's
-  // deployed at (see the dashboard's dynamic redirect-link derivation from
-  // request headers), so there's no single fixed canonical host to check
-  // requests against in production.
   trustHost: true,
   logger: {
     error(error) {
-      // Expected on every wrong email/password attempt (or a login retried
-      // after the account was deleted) — already caught and shown to the
-      // user as "Invalid email or password" by `loginAction`. Logging it
-      // with a full stack trace here just reads like a crash.
       if (error instanceof CredentialsSignin) return
       console.error(error)
     },
@@ -60,6 +53,26 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           }
 
           await prisma.verificationToken.delete({ where: { token: credentials.verificationToken } })
+
+          if (record.type === VerificationTokenType.EMAIL_CHANGE) {
+            const pendingUser = await prisma.user.findFirst({ where: { pendingEmail: record.identifier } })
+            if (!pendingUser) throw new VerificationTokenInvalidSignin()
+
+            try {
+              const user = await prisma.user.update({
+                where: { id: pendingUser.id },
+                data: { email: record.identifier, emailVerified: new Date(), pendingEmail: null },
+              })
+              return { id: user.id, email: user.email, name: user.name }
+            } catch (error) {
+              // Someone else claimed this email address while the confirmation was pending.
+              if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+                throw new VerificationTokenInvalidSignin()
+              }
+              throw error
+            }
+          }
+
           const user = await prisma.user.update({
             where: { email: record.identifier },
             data: { emailVerified: new Date() },

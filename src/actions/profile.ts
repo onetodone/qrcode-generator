@@ -2,7 +2,8 @@
 
 import bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
-import { auth, signOut, unstable_update } from '@/auth'
+import { auth, unstable_update } from '@/auth'
+import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { changePasswordSchema, updateProfileSchema } from '@/schemas/profile'
@@ -24,32 +25,47 @@ export async function updateProfileAction(_prevState: ProfileFormState, formData
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input.' }
   }
 
-  const currentUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { email: true } })
+  const currentUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { email: true, pendingEmail: true },
+  })
   const emailChanged = currentUser?.email !== parsed.data.email
 
-  const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } })
-  if (existing && existing.id !== session.user.id) {
-    return { error: 'An account with this email already exists.' }
+  if (emailChanged) {
+    const existing = await prisma.user.findFirst({
+      where: {
+        id: { not: session.user.id },
+        OR: [{ email: parsed.data.email }, { pendingEmail: parsed.data.email }],
+      },
+    })
+    if (existing) {
+      return { error: 'An account with this email already exists.' }
+    }
   }
 
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
       name: parsed.data.name,
-      email: parsed.data.email,
-      ...(emailChanged ? { emailVerified: null } : {}),
+      // The real `email`/`emailVerified` stay untouched until the new
+      // address is confirmed, so a typo here can't lock the user out.
+      // Saving the current email again cancels a pending change.
+      ...(emailChanged ? { pendingEmail: parsed.data.email } : currentUser?.pendingEmail ? { pendingEmail: null } : {}),
     },
   })
 
   if (emailChanged) {
-    await sendVerificationEmail(parsed.data.email)
-    await signOut({ redirectTo: `/verify-email?email=${encodeURIComponent(parsed.data.email)}` })
+    await sendVerificationEmail(parsed.data.email, VerificationTokenType.EMAIL_CHANGE)
   }
 
-  // Keep the JWT session in sync, otherwise the old name/email would linger
-  // in the session cookie until the next login.
+  if (currentUser?.pendingEmail && currentUser.pendingEmail !== parsed.data.email) {
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: currentUser.pendingEmail, type: VerificationTokenType.EMAIL_CHANGE },
+    })
+  }
+
   await unstable_update({
-    user: { name: parsed.data.name, email: parsed.data.email },
+    user: { name: parsed.data.name },
   })
 
   revalidatePath('/profile')

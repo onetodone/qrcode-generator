@@ -17,5 +17,21 @@ export const loginSchema = z.object({
 
 export const emailSchema = z.email({ error: 'Please enter a valid email address.' }).trim()
 
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, { error: 'Missing reset token.' }),
+    // bcrypt silently truncates at 72 bytes, so reject longer input up front.
+    newPassword: z
+      .string()
+      .min(8, { error: 'New password must be at least 8 characters.' })
+      .max(72, { error: 'New password must be at most 72 characters.' }),
+    confirmPassword: z.string().min(1, { error: 'Please repeat the new password.' }),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    error: 'New passwords do not match.',
+    path: ['confirmPassword'],
+  })
+
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>

@@ -9,15 +9,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { ResendVerificationForm } from '@/app/verify-email/resend-verification-form'
 
 export function ProfileForm({
   defaultName,
   defaultEmail,
   emailVerified,
+  pendingEmail,
 }: {
   defaultName: string
   defaultEmail: string
   emailVerified: boolean
+  pendingEmail: string | null
 }) {
   const [name, setName] = useState(defaultName)
   const [email, setEmail] = useState(defaultEmail)
@@ -79,6 +82,12 @@ export function ProfileForm({
             </Button>
           </FieldGroup>
         </form>
+        {pendingEmail && (
+          <ResendVerificationForm email={pendingEmail} variant="inline" className="mt-4">
+            Confirmation pending for <span className="font-medium text-foreground">{pendingEmail}</span>. Check your
+            inbox to finish the change — your current email keeps working until then.
+          </ResendVerificationForm>
+        )}
       </CardContent>
     </Card>
   )
