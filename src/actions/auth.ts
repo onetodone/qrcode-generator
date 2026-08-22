@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { AuthError } from 'next-auth'
 import { EmailNotVerifiedSignin, signIn, signOut } from '@/auth'
+import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { emailSchema, loginSchema, registerSchema } from '@/schemas/auth'
@@ -34,7 +35,6 @@ export async function loginAction(_prevState: AuthFormState, formData: FormData)
     if (error instanceof AuthError) {
       return { error: 'Invalid email or password.' }
     }
-    // `signIn` throws Next.js's internal redirect signal on success — rethrow it.
     throw error
   }
 }
@@ -85,9 +85,16 @@ export async function resendVerificationEmailAction(
     return { error: 'Invalid email address.' }
   }
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data } })
-  if (user && !user.emailVerified) {
-    const sent = await sendVerificationEmail(parsed.data)
+  const user = await prisma.user.findFirst({
+    where: { OR: [{ email: parsed.data }, { pendingEmail: parsed.data }] },
+  })
+
+  const type = user?.pendingEmail === parsed.data ? VerificationTokenType.EMAIL_CHANGE : VerificationTokenType.EMAIL_VERIFY
+  const shouldSend =
+    type === VerificationTokenType.EMAIL_CHANGE ? Boolean(user) : Boolean(user && !user.emailVerified)
+
+  if (shouldSend) {
+    const sent = await sendVerificationEmail(parsed.data, type)
     if (!sent) {
       return { error: 'A confirmation email was already sent recently. Please wait a bit before requesting another.' }
     }

@@ -15,6 +15,7 @@ model User {
   name          String?
   email         String    @unique
   emailVerified DateTime?
+  pendingEmail  String?
   image         String?
   password      String
 
@@ -44,11 +45,17 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
+enum VerificationTokenType {
+  EMAIL_VERIFY
+  EMAIL_CHANGE
+}
+
 model VerificationToken {
   identifier String
-  token      String   @unique
+  token      String                @unique
+  type       VerificationTokenType @default(EMAIL_VERIFY)
   expires    DateTime
-  createdAt  DateTime @default(now())
+  createdAt  DateTime              @default(now())
 
   @@unique([identifier, token])
 }
