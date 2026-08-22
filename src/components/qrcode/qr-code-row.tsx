@@ -87,7 +87,7 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
           {qrCode.leadsTo}
         </a>
       </TableCell>
-      <TableCell className="max-w-48 whitespace-normal break-words">{qrCode.note}</TableCell>
+      <TableCell className="max-w-48 whitespace-normal break-words">{qrCode.note || '-'}</TableCell>
       <TableCell>
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={handleDownloadSvg}>
