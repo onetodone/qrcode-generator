@@ -1,9 +1,24 @@
-import NextAuth from 'next-auth'
+import NextAuth, { CredentialsSignin } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { sendVerificationEmail } from '@/lib/verification'
 import { loginSchema } from '@/schemas/auth'
+
+export class EmailNotVerifiedSignin extends CredentialsSignin {
+  code = 'email_not_verified'
+}
+
+export class VerificationTokenExpiredSignin extends CredentialsSignin {
+  code = 'verification_token_expired'
+  constructor(public email: string) {
+    super()
+  }
+}
+export class VerificationTokenInvalidSignin extends CredentialsSignin {
+  code = 'verification_token_invalid'
+}
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -21,7 +36,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       // after the account was deleted) — already caught and shown to the
       // user as "Invalid email or password" by `loginAction`. Logging it
       // with a full stack trace here just reads like a crash.
-      if (error.name === 'CredentialsSignin') return
+      if (error instanceof CredentialsSignin) return
       console.error(error)
     },
   },
@@ -30,8 +45,28 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        verificationToken: { label: 'Verification token', type: 'text' },
       },
       authorize: async (credentials) => {
+        if (typeof credentials?.verificationToken === 'string') {
+          const record = await prisma.verificationToken.findUnique({
+            where: { token: credentials.verificationToken },
+          })
+          if (!record) throw new VerificationTokenInvalidSignin()
+
+          if (record.expires < new Date()) {
+            await prisma.verificationToken.delete({ where: { token: credentials.verificationToken } })
+            throw new VerificationTokenExpiredSignin(record.identifier)
+          }
+
+          await prisma.verificationToken.delete({ where: { token: credentials.verificationToken } })
+          const user = await prisma.user.update({
+            where: { email: record.identifier },
+            data: { emailVerified: new Date() },
+          })
+          return { id: user.id, email: user.email, name: user.name }
+        }
+
         const parsed = loginSchema.safeParse(credentials)
         if (!parsed.success) return null
 
@@ -42,6 +77,11 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
         const passwordsMatch = await bcrypt.compare(parsed.data.password, user.password)
         if (!passwordsMatch) return null
+
+        if (!user.emailVerified) {
+          await sendVerificationEmail(user.email)
+          throw new EmailNotVerifiedSignin()
+        }
 
         return { id: user.id, email: user.email, name: user.name }
       },

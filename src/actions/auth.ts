@@ -1,12 +1,15 @@
 'use server'
 
+import { redirect } from 'next/navigation'
 import { AuthError } from 'next-auth'
-import { signIn, signOut } from '@/auth'
+import { EmailNotVerifiedSignin, signIn, signOut } from '@/auth'
 import { prisma } from '@/lib/prisma'
-import { loginSchema, registerSchema } from '@/schemas/auth'
+import { sendVerificationEmail } from '@/lib/verification'
+import { emailSchema, loginSchema, registerSchema } from '@/schemas/auth'
 import bcrypt from 'bcryptjs'
 
 export type AuthFormState = { error?: string } | undefined
+export type ResendVerificationFormState = { error?: string; success?: boolean } | undefined
 
 export async function loginAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = loginSchema.safeParse({
@@ -25,6 +28,9 @@ export async function loginAction(_prevState: AuthFormState, formData: FormData)
       redirectTo: '/',
     })
   } catch (error) {
+    if (error instanceof EmailNotVerifiedSignin) {
+      redirect(`/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+    }
     if (error instanceof AuthError) {
       return { error: 'Invalid email or password.' }
     }
@@ -65,16 +71,27 @@ export async function registerAction(_prevState: AuthFormState, formData: FormDa
     },
   })
 
-  try {
-    await signIn('credentials', {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      redirectTo: '/',
-    })
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return { error: 'Account created, but sign-in failed. Please sign in manually.' }
-    }
-    throw error
+  await sendVerificationEmail(parsed.data.email)
+
+  redirect(`/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+}
+
+export async function resendVerificationEmailAction(
+  _prevState: ResendVerificationFormState,
+  formData: FormData,
+): Promise<ResendVerificationFormState> {
+  const parsed = emailSchema.safeParse(formData.get('email'))
+  if (!parsed.success) {
+    return { error: 'Invalid email address.' }
   }
+
+  const user = await prisma.user.findUnique({ where: { email: parsed.data } })
+  if (user && !user.emailVerified) {
+    const sent = await sendVerificationEmail(parsed.data)
+    if (!sent) {
+      return { error: 'A confirmation email was already sent recently. Please wait a bit before requesting another.' }
+    }
+  }
+
+  return { success: true }
 }

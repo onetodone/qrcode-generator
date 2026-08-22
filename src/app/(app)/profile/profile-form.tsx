@@ -4,12 +4,21 @@ import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { updateProfileAction, type ProfileFormState } from '@/actions/profile'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-export function ProfileForm({ defaultName, defaultEmail }: { defaultName: string; defaultEmail: string }) {
+export function ProfileForm({
+  defaultName,
+  defaultEmail,
+  emailVerified,
+}: {
+  defaultName: string
+  defaultEmail: string
+  emailVerified: boolean
+}) {
   const [name, setName] = useState(defaultName)
   const [email, setEmail] = useState(defaultEmail)
   const router = useRouter()
@@ -18,12 +27,6 @@ export function ProfileForm({ defaultName, defaultEmail }: { defaultName: string
   useEffect(() => {
     if (state?.success) {
       toast.success('Profile updated.')
-      // The header reads the name/email from the session layout above this
-      // page. That layout's own `auth()` call was already memoized (via
-      // React's per-request cache) by the time this action ran, so the
-      // action's own re-render can still show the pre-update session even
-      // though the cookie itself is already correct. A client-side refresh
-      // starts a genuinely new request, which reads the now-updated cookie.
       router.refresh()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,7 +55,12 @@ export function ProfileForm({ defaultName, defaultEmail }: { defaultName: string
               </FieldContent>
             </Field>
             <Field>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <FieldLabel htmlFor="email" className="items-center gap-2">
+                Email
+                <Badge variant={emailVerified ? 'secondary' : 'destructive'}>
+                  {emailVerified ? 'Confirmed' : 'Not confirmed'}
+                </Badge>
+              </FieldLabel>
               <FieldContent>
                 <Input
                   id="email"
