@@ -48,6 +48,7 @@ model Account {
 enum VerificationTokenType {
   EMAIL_VERIFY
   EMAIL_CHANGE
+  PASSWORD_RESET
 }
 
 model VerificationToken {

@@ -39,7 +39,15 @@ export function LoginForm() {
               </FieldContent>
             </Field>
             <Field>
-              <FieldLabel htmlFor="password">Password</FieldLabel>
+              <FieldLabel htmlFor="password" className="w-full items-center justify-between">
+                Password
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-normal text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                >
+                  Forgot password?
+                </Link>
+              </FieldLabel>
               <FieldContent>
                 <Input
                   id="password"

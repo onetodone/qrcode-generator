@@ -8,7 +8,12 @@ export function SiteHeader({ userName }: { userName?: string | null }) {
     <header className="border-b">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 p-4 sm:px-8">
         <Link href="/" className="text-xl font-semibold">
-          QR Code
+          {/* QR Code */}
+          <img
+            src={`${process.env.APP_URL}/logo.png`}
+            alt="QR Code OneToDone"
+            className="max-h-[42px] max-w-[240px]"
+          />
         </Link>
         <nav className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" nativeButton={false} render={<Link href="/" />}>

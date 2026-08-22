@@ -27,7 +27,7 @@ function renderHeader(): string {
   return `
     <tr>
       <td style="padding:32px 32px 0;text-align:center;">
-        <img src="${process.env.APP_URL}/logo-mail.png" alt="" style="max-height:48px;max-width:240px;" />
+        <img src="${process.env.APP_URL}/logo.png" alt="" style="max-height:48px;max-width:240px;" />
       </td>
     </tr>`
 }
