@@ -17,7 +17,9 @@ export function ForgotPasswordForm() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Check your email</CardTitle>
-          <CardDescription>If an account exists for {email}, we&apos;ve sent a link to reset your password.</CardDescription>
+          <CardDescription>
+            If an account exists for {email}, we&apos;ve sent a link to reset your password.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Button className="w-full" variant="outline" nativeButton={false} render={<Link href="/login" />}>

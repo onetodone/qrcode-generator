@@ -90,9 +90,9 @@ export async function resendVerificationEmailAction(
     where: { OR: [{ email: parsed.data }, { pendingEmail: parsed.data }] },
   })
 
-  const type = user?.pendingEmail === parsed.data ? VerificationTokenType.EMAIL_CHANGE : VerificationTokenType.EMAIL_VERIFY
-  const shouldSend =
-    type === VerificationTokenType.EMAIL_CHANGE ? Boolean(user) : Boolean(user && !user.emailVerified)
+  const type =
+    user?.pendingEmail === parsed.data ? VerificationTokenType.EMAIL_CHANGE : VerificationTokenType.EMAIL_VERIFY
+  const shouldSend = type === VerificationTokenType.EMAIL_CHANGE ? Boolean(user) : Boolean(user && !user.emailVerified)
 
   if (shouldSend) {
     const sent = await sendVerificationEmail(parsed.data, type)

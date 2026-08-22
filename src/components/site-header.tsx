@@ -10,9 +10,9 @@ export function SiteHeader({ userName }: { userName?: string | null }) {
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 p-4 sm:px-8">
         <Link href="/" className="text-xl font-semibold">
           <Image
-            src={`${process.env.APP_URL}/logo.png`}
+            src="/logo.png"
             alt="QR Code OneToDone"
-            width={240}
+            width={42}
             height={42}
             className="h-auto max-h-[42px] max-w-[240px] w-auto"
             priority

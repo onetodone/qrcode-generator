@@ -18,11 +18,15 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
   }
 
   const record = await prisma.verificationToken.findUnique({ where: { token } })
-  const isValid = Boolean(record) && record?.type === VerificationTokenType.PASSWORD_RESET && record.expires > new Date()
+  const isValid =
+    Boolean(record) && record?.type === VerificationTokenType.PASSWORD_RESET && record.expires > new Date()
 
   if (!isValid) {
     return (
-      <ResetPasswordLayout title="Invalid or expired link" description="This password reset link is invalid or has expired.">
+      <ResetPasswordLayout
+        title="Invalid or expired link"
+        description="This password reset link is invalid or has expired."
+      >
         <Button className="w-full" variant="outline" nativeButton={false} render={<Link href="/forgot-password" />}>
           Request a new link
         </Button>
