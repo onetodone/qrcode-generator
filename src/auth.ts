@@ -31,6 +31,8 @@ async function passwordChangedAtMs(userId: string): Promise<number | null> {
   return record.passwordChangedAt?.getTime() ?? 0
 }
 
+const SESSION_REVALIDATE_MS = 30_000
+
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   adapter: PrismaAdapter(prisma),
   // Credentials-based auth only supports JWT sessions, not database sessions.
@@ -124,6 +126,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const userId = user.id as string
         token.id = userId
         token.passwordChangedAt = (await passwordChangedAtMs(userId)) ?? 0
+        token.checkedAt = Date.now()
         return token
       }
 
@@ -137,12 +140,17 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const changedAt = await passwordChangedAtMs(userId)
         if (changedAt === null) return null
         token.passwordChangedAt = changedAt
+        token.checkedAt = Date.now()
         return token
       }
+
+      const checkedAt = typeof token.checkedAt === 'number' ? token.checkedAt : 0
+      if (Date.now() - checkedAt < SESSION_REVALIDATE_MS) return token
 
       const changedAt = await passwordChangedAtMs(userId)
       if (changedAt === null) return null
       if (changedAt > issuedFor) return null
+      token.checkedAt = Date.now()
 
       return token
     },
