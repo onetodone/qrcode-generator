@@ -1,6 +1,6 @@
 {
   "name": "qrcode-generator",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "QR code generator with scan tracking — create QR codes, redirect scans through a short link, and see view counts per code.",
   "private": true,
   "author": "Anton Holubeu (https://github.com/aholu)",

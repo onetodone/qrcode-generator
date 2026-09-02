@@ -6,7 +6,7 @@ import { PlusIcon } from 'lucide-react'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { Button } from '@/components/ui/button'
-import { QrCodeTable } from '@/components/qrcode/qr-code-table'
+import { QrCodeGrid } from '@/components/qrcode/qr-code-grid'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -46,7 +46,7 @@ export default async function DashboardPage() {
           Add QR Code
         </Button>
       </div>
-      <QrCodeTable qrCodes={rows} />
+      <QrCodeGrid qrCodes={rows} />
     </div>
   )
 }
