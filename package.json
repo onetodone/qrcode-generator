@@ -27,7 +27,8 @@
     "start": "dotenv -e .env -- next start",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "lint": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "lint:ci": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
