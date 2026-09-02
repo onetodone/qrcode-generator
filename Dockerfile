@@ -7,13 +7,6 @@ RUN npm install -g corepack@latest && corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
-FROM node:26-alpine AS prod-deps
-RUN apk add --no-cache libc6-compat
-WORKDIR /app
-RUN npm install -g corepack@latest && corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --prod --frozen-lockfile
-
 FROM node:26-alpine AS builder
 RUN apk add --no-cache openssl
 RUN npm install -g corepack@latest && corepack enable
@@ -24,9 +17,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm exec prisma generate
 RUN pnpm build
 
-# Used directly by docker-compose (target: builder) as the one-shot
-# `prisma migrate deploy` runner — it already has the CLI, schema, and
-# migrations, so no separate stage is needed just for that.
 
 FROM node:26-alpine AS runner
 WORKDIR /app
@@ -35,16 +25,15 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=builder /app/prisma/generated ./prisma/generated
-COPY --from=builder /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY package.json next.config.ts ./
+COPY --from=builder /app/prisma/generated ./prisma/generated
 
-RUN chown -R nextjs:nodejs .next
 USER nextjs
 
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 EXPOSE 3000
 
-CMD ["node_modules/.bin/next", "start"]
+CMD ["node", "server.js"]
