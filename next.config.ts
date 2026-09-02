@@ -2,6 +2,8 @@ import type { NextConfig } from 'next'
 
 const isDev = process.env.NODE_ENV !== 'production'
 
+const selfHosted = !process.env.VERCEL
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -25,11 +27,17 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' },
 ]
 
+const standaloneConfig: NextConfig = selfHosted
+  ? {
+      output: 'standalone',
+      outputFileTracingIncludes: {
+        '/**/*': ['./node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/**/*'],
+      },
+    }
+  : {}
+
 const nextConfig: NextConfig = {
-  output: 'standalone',
-  outputFileTracingIncludes: {
-    '/**/*': ['./node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/**/*'],
-  },
+  ...standaloneConfig,
   poweredByHeader: false,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
