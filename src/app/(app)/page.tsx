@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { PlusIcon } from 'lucide-react'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
-import { AddQrCodeDialog } from '@/components/qrcode/add-qrcode-dialog'
+import { Button } from '@/components/ui/button'
 import { QrCodeTable } from '@/components/qrcode/qr-code-table'
 
 export const metadata: Metadata = {
@@ -39,7 +41,10 @@ export default async function DashboardPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Your QR Codes</h1>
-        <AddQrCodeDialog />
+        <Button nativeButton={false} render={<Link href="/qr-codes/new" />}>
+          <PlusIcon />
+          Add QR Code
+        </Button>
       </div>
       <QrCodeTable qrCodes={rows} />
     </div>

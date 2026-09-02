@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef } from 'react'
-import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react'
+import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { PencilIcon, Trash2Icon } from 'lucide-react'
+import type { QrShapeValue } from '@/schemas/qrcode'
 import { TableCell, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { SubmitButton } from '@/components/ui/submit-button'
@@ -16,8 +17,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { QrCodeFormDialog } from '@/components/qrcode/qrcode-form-dialog'
-import { deleteQrCodeAction, updateQrCodeAction } from '@/actions/qrcode'
+import { QrImage } from '@/components/qrcode/qr-image'
+import { deleteQrCodeAction } from '@/actions/qrcode'
 
 // High enough resolution for print materials (posters, booklets).
 const DOWNLOAD_SIZE = 1024
@@ -27,6 +28,9 @@ export type QrCodeRowData = {
   urlHash: string
   note: string
   leadsTo: string
+  shape: QrShapeValue
+  fgColor: string
+  bgColor: string
   views: number
   redirectUrl: string
 }
@@ -40,46 +44,68 @@ function triggerDownload(href: string, filename: string) {
   document.body.removeChild(link)
 }
 
+function upscaledClone(svg: SVGSVGElement): SVGSVGElement {
+  const clone = svg.cloneNode(true) as SVGSVGElement
+  clone.setAttribute('width', String(DOWNLOAD_SIZE))
+  clone.setAttribute('height', String(DOWNLOAD_SIZE))
+  return clone
+}
+
+function randomFileToken(length = 8): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  const bytes = crypto.getRandomValues(new Uint8Array(length))
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('')
+}
+
 export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [downloadName] = useState(() => `qrcode-${randomFileToken()}`)
 
   function handleDownloadSvg() {
     const svg = svgRef.current
     if (!svg) return
 
     // SVG is resolution-independent, so upsizing the exported copy is free.
-    const clone = svg.cloneNode(true) as SVGSVGElement
-    clone.setAttribute('width', String(DOWNLOAD_SIZE))
-    clone.setAttribute('height', String(DOWNLOAD_SIZE))
-
-    const serialized = new XMLSerializer().serializeToString(clone)
-    const blob = new Blob([serialized], { type: 'image/svg+xml' })
+    const serialized = new XMLSerializer().serializeToString(upscaledClone(svg))
+    const blob = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(blob)
-    triggerDownload(url, `qrcode-${qrCode.urlHash}.svg`)
+    triggerDownload(url, `${downloadName}.svg`)
     URL.revokeObjectURL(url)
   }
 
   function handleDownloadPng() {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    triggerDownload(canvas.toDataURL('image/png'), `qrcode-${qrCode.urlHash}.png`)
+    const svg = svgRef.current
+    if (!svg) return
+
+    const serialized = new XMLSerializer().serializeToString(upscaledClone(svg))
+    const url = URL.createObjectURL(new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' }))
+    const image = new Image()
+    image.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = DOWNLOAD_SIZE
+      canvas.height = DOWNLOAD_SIZE
+      const context = canvas.getContext('2d')
+      if (context) {
+        context.drawImage(image, 0, 0, DOWNLOAD_SIZE, DOWNLOAD_SIZE)
+        triggerDownload(canvas.toDataURL('image/png'), `${downloadName}.png`)
+      }
+      URL.revokeObjectURL(url)
+    }
+    image.onerror = () => URL.revokeObjectURL(url)
+    image.src = url
   }
 
   return (
     <TableRow>
       <TableCell>
-        <QRCodeSVG ref={svgRef} value={qrCode.redirectUrl} size={64} marginSize={1} />
-        {/* Hidden high-res canvas, rendered off-screen purely for PNG export. */}
-        <div style={{ display: 'none' }} aria-hidden>
-          <QRCodeCanvas
-            ref={canvasRef}
-            value={qrCode.redirectUrl}
-            size={DOWNLOAD_SIZE}
-            marginSize={1}
-            bgColor="#FFFFFF00"
-          />
-        </div>
+        <QrImage
+          ref={svgRef}
+          value={qrCode.redirectUrl}
+          shape={qrCode.shape}
+          fgColor={qrCode.fgColor}
+          bgColor={qrCode.bgColor}
+          size={64}
+        />
       </TableCell>
       <TableCell>{qrCode.views}</TableCell>
       <TableCell className="max-w-64 whitespace-normal break-words">
@@ -100,18 +126,15 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
       </TableCell>
       <TableCell>
         <div className="flex gap-1">
-          <QrCodeFormDialog
-            triggerElement={<Button variant="ghost" size="icon-sm" aria-label="Edit QR code" />}
-            triggerContent={<PencilIcon />}
-            title="Edit QR Code"
-            description="Update where this code points. The QR image itself stays the same."
-            submitLabel="Save changes"
-            pendingLabel="Saving..."
-            successMessage="QR code updated."
-            action={updateQrCodeAction}
-            defaultValues={{ leadsTo: qrCode.leadsTo, note: qrCode.note }}
-            hiddenId={qrCode.id}
-          />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            nativeButton={false}
+            aria-label="Edit QR code"
+            render={<Link href={`/qr-codes/${qrCode.id}/edit`} />}
+          >
+            <PencilIcon />
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Delete QR code" />}>
               <Trash2Icon />

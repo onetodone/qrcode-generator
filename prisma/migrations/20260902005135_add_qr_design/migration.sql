@@ -1,0 +1,7 @@
+-- CreateEnum
+CREATE TYPE "QrShape" AS ENUM ('SQUARE', 'ROUNDED', 'DOTS');
+
+-- AlterTable
+ALTER TABLE "QrCode" ADD COLUMN     "bgColor" TEXT NOT NULL DEFAULT '#ffffff',
+ADD COLUMN     "fgColor" TEXT NOT NULL DEFAULT '#000000',
+ADD COLUMN     "shape" "QrShape" NOT NULL DEFAULT 'SQUARE';
