@@ -47,6 +47,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           })
           if (!record) throw new VerificationTokenInvalidSignin()
 
+          if (
+            record.type !== VerificationTokenType.EMAIL_VERIFY &&
+            record.type !== VerificationTokenType.EMAIL_CHANGE
+          ) {
+            throw new VerificationTokenInvalidSignin()
+          }
+
           if (record.expires < new Date()) {
             await prisma.verificationToken.delete({ where: { token: credentials.verificationToken } })
             throw new VerificationTokenExpiredSignin(record.identifier)
