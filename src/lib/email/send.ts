@@ -1,4 +1,5 @@
 import type { Attachment } from 'nodemailer/lib/mailer'
+import { logger } from '@/lib/logger'
 import { getSmtpConfig } from './config'
 import { minifyHtml } from './minify'
 import { renderEmailTemplate } from './template'
@@ -40,7 +41,7 @@ export async function sendEmail({
       attachments,
     })
   } catch (error) {
-    console.error('[email] failed to send', error)
+    logger.error('email.send_failed', { error, to })
     throw error
   }
 }

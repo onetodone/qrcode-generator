@@ -1,5 +1,6 @@
 import { PrismaClient } from '@/generated/client'
 import { PrismaPg } from '@prisma/adapter-pg'
+import { logger } from '@/lib/logger'
 
 const SLOW_QUERY_THRESHOLD_MS = 200
 
@@ -18,7 +19,7 @@ function createPrismaClient() {
         const durationMs = performance.now() - start
 
         if (durationMs > SLOW_QUERY_THRESHOLD_MS) {
-          console.warn(`[prisma] slow query: ${model ?? 'raw'}.${operation} took ${durationMs.toFixed(1)}ms`)
+          logger.warn('prisma.slow_query', { model: model ?? 'raw', operation, durationMs: Math.round(durationMs) })
         }
 
         return result

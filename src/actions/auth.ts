@@ -7,13 +7,20 @@ import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { emailSchema, loginSchema, registerSchema, resetPasswordSchema } from '@/schemas/auth'
-import bcrypt from 'bcryptjs'
+import { rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
+import { getClientIp } from '@/lib/request'
+import { firstZodError, type FormState } from '@/lib/forms'
+import { hashPassword } from '@/lib/password'
 
-export type AuthFormState = { error?: string } | undefined
-export type ResendVerificationFormState = { error?: string; success?: boolean } | undefined
-export type ResetPasswordFormState = { error?: string; success?: boolean } | undefined
+const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
+const ONE_HOUR_MS = 60 * 60 * 1000
 
-export async function loginAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
+export async function loginAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const login = rateLimit(`login:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
+  if (!login.ok) {
+    return { error: tooManyAttemptsMessage(login.retryAfterMs) }
+  }
+
   const parsed = loginSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
@@ -44,7 +51,12 @@ export async function logoutAction(): Promise<void> {
   await signOut({ redirectTo: '/login' })
 }
 
-export async function registerAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
+export async function registerAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const register = rateLimit(`register:${await getClientIp()}`, { limit: 5, windowMs: ONE_HOUR_MS })
+  if (!register.ok) {
+    return { error: tooManyAttemptsMessage(register.retryAfterMs) }
+  }
+
   const parsed = registerSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),
@@ -52,7 +64,7 @@ export async function registerAction(_prevState: AuthFormState, formData: FormDa
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid input.' }
+    return { error: firstZodError(parsed.error) }
   }
 
   const existing = await prisma.user.findUnique({
@@ -62,13 +74,11 @@ export async function registerAction(_prevState: AuthFormState, formData: FormDa
     return { error: 'An account with this email already exists.' }
   }
 
-  const hashedPassword = await bcrypt.hash(parsed.data.password, 10)
-
   await prisma.user.create({
     data: {
       name: parsed.data.name,
       email: parsed.data.email,
-      password: hashedPassword,
+      password: await hashPassword(parsed.data.password),
     },
   })
 
@@ -77,10 +87,12 @@ export async function registerAction(_prevState: AuthFormState, formData: FormDa
   redirect(`/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
 }
 
-export async function resendVerificationEmailAction(
-  _prevState: ResendVerificationFormState,
-  formData: FormData,
-): Promise<ResendVerificationFormState> {
+export async function resendVerificationEmailAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const resend = rateLimit(`resend-verification:${await getClientIp()}`, { limit: 5, windowMs: FIFTEEN_MINUTES_MS })
+  if (!resend.ok) {
+    return { error: tooManyAttemptsMessage(resend.retryAfterMs) }
+  }
+
   const parsed = emailSchema.safeParse(formData.get('email'))
   if (!parsed.success) {
     return { error: 'Invalid email address.' }
@@ -104,10 +116,12 @@ export async function resendVerificationEmailAction(
   return { success: true }
 }
 
-export async function forgotPasswordAction(
-  _prevState: ResetPasswordFormState,
-  formData: FormData,
-): Promise<ResetPasswordFormState> {
+export async function forgotPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const forgot = rateLimit(`forgot-password:${await getClientIp()}`, { limit: 5, windowMs: FIFTEEN_MINUTES_MS })
+  if (!forgot.ok) {
+    return { error: tooManyAttemptsMessage(forgot.retryAfterMs) }
+  }
+
   const parsed = emailSchema.safeParse(formData.get('email'))
   if (!parsed.success) {
     return { error: 'Please enter a valid email address.' }
@@ -124,17 +138,19 @@ export async function forgotPasswordAction(
   return { success: true }
 }
 
-export async function resetPasswordAction(
-  _prevState: ResetPasswordFormState,
-  formData: FormData,
-): Promise<ResetPasswordFormState> {
+export async function resetPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const reset = rateLimit(`reset-password:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
+  if (!reset.ok) {
+    return { error: tooManyAttemptsMessage(reset.retryAfterMs) }
+  }
+
   const parsed = resetPasswordSchema.safeParse({
     token: formData.get('token'),
     newPassword: formData.get('newPassword'),
     confirmPassword: formData.get('confirmPassword'),
   })
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid input.' }
+    return { error: firstZodError(parsed.error) }
   }
 
   const record = await prisma.verificationToken.findUnique({ where: { token: parsed.data.token } })
@@ -155,10 +171,9 @@ export async function resetPasswordAction(
     return { error: 'This reset link is invalid or has already been used.' }
   }
 
-  const hashedPassword = await bcrypt.hash(parsed.data.newPassword, 10)
   await prisma.user.update({
     where: { id: user.id },
-    data: { password: hashedPassword },
+    data: { password: await hashPassword(parsed.data.newPassword), passwordChangedAt: new Date() },
   })
 
   return { success: true }

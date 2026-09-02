@@ -20,7 +20,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec prisma generate
-      - run: pnpm lint
+      - run: pnpm lint:ci
+      - run: pnpm typecheck
       - run: pnpm build
 
   docker:

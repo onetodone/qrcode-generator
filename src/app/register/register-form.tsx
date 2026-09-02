@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { registerAction, type AuthFormState } from '@/actions/auth'
+import { registerAction } from '@/actions/auth'
+import type { FormState } from '@/lib/forms'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +15,7 @@ export function RegisterForm() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [state, action, pending] = useActionState<AuthFormState, FormData>(registerAction, undefined)
+  const [state, action, pending] = useActionState<FormState, FormData>(registerAction, undefined)
 
   return (
     <Card className="w-full max-w-sm">

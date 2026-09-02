@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { PencilIcon, Trash2Icon } from 'lucide-react'
 import type { QrShapeValue } from '@/schemas/qrcode'
+import { randomToken } from '@/lib/random'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -52,15 +53,9 @@ function upscaledClone(svg: SVGSVGElement): SVGSVGElement {
   return clone
 }
 
-function randomFileToken(length = 8): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  const bytes = crypto.getRandomValues(new Uint8Array(length))
-  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('')
-}
-
 export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const [downloadName] = useState(() => `qrcode-${randomFileToken()}`)
+  const [downloadName] = useState(() => `qrcode-${randomToken(8)}`)
 
   function handleDownloadSvg() {
     const svg = svgRef.current

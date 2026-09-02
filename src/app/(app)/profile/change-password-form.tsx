@@ -1,8 +1,10 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useState } from 'react'
 import { toast } from 'sonner'
-import { changePasswordAction, type ProfileFormState } from '@/actions/profile'
+import { changePasswordAction } from '@/actions/profile'
+import type { FormState } from '@/lib/forms'
+import { useActionResult } from '@/hooks/use-action-result'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,7 +14,7 @@ const emptyFields = { currentPassword: '', newPassword: '', confirmPassword: '' 
 
 export function ChangePasswordForm() {
   const [fields, setFields] = useState(emptyFields)
-  const [state, action, pending] = useActionState<ProfileFormState, FormData>(changePasswordAction, undefined)
+  const [state, action, pending] = useActionState<FormState, FormData>(changePasswordAction, undefined)
 
   // Don't leave old/new passwords sitting in the form after a successful
   // change. Done during render (comparing against the previous state)
@@ -26,12 +28,7 @@ export function ChangePasswordForm() {
     }
   }
 
-  // The toast is a genuine external side effect, so it stays in an Effect.
-  useEffect(() => {
-    if (state?.success) {
-      toast.success('Password changed.')
-    }
-  }, [state])
+  useActionResult(state, { onSuccess: () => toast.success('Password changed.') })
 
   function updateField(key: keyof typeof emptyFields) {
     return (event: React.ChangeEvent<HTMLInputElement>) => setFields((prev) => ({ ...prev, [key]: event.target.value }))

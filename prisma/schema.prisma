@@ -18,6 +18,7 @@ model User {
   pendingEmail  String?
   image         String?
   password      String
+  passwordChangedAt DateTime?
 
   accounts Account[]
   qrCodes  QrCode[]

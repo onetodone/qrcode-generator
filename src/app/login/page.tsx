@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { AuthLayout } from '@/components/auth-card'
 import { LoginForm } from './login-form'
 
 export const metadata: Metadata = {
@@ -7,8 +8,8 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-svh items-center justify-center p-4">
+    <AuthLayout>
       <LoginForm />
-    </div>
+    </AuthLayout>
   )
 }

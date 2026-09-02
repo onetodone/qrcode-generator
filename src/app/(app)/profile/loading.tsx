@@ -1,5 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { PageContainer, PageHeader } from '@/components/page-header'
 
 function FormCardSkeleton({ fields }: { fields: number }) {
   return (
@@ -23,13 +24,10 @@ function FormCardSkeleton({ fields }: { fields: number }) {
 
 export default function ProfileLoading() {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="text-sm text-muted-foreground">Manage your account details.</p>
-      </div>
+    <PageContainer>
+      <PageHeader title="Profile" description="Manage your account details." />
       <FormCardSkeleton fields={2} />
       <FormCardSkeleton fields={3} />
-    </div>
+    </PageContainer>
   )
 }

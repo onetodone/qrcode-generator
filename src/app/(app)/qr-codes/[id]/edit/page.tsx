@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
-import { notFound, redirect } from 'next/navigation'
-import { auth } from '@/auth'
+import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getBaseUrl } from '@/lib/request'
+import { requireUserId } from '@/lib/auth-guard'
 import { updateQrCodeAction } from '@/actions/qrcode'
+import { PageContainer, PageHeader } from '@/components/page-header'
 import { QrCodeForm } from '@/components/qrcode/qr-code-form'
 
 export const metadata: Metadata = {
@@ -12,37 +13,28 @@ export const metadata: Metadata = {
 
 export default async function EditQrCodePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [session, requestHeaders] = await Promise.all([auth(), headers()])
-  if (!session?.user?.id) {
-    redirect('/login')
-  }
+  const userId = await requireUserId()
 
-  const qrCode = await prisma.qrCode.findFirst({
-    where: { id, userId: session.user.id },
-  })
+  const qrCode = await prisma.qrCode.findFirst({ where: { id, userId } })
   if (!qrCode) {
     notFound()
   }
 
-  const proto = requestHeaders.get('x-forwarded-proto') ?? 'http'
-  const host = requestHeaders.get('host')
-  const previewValue = `${proto}://${host}/s/${qrCode.urlHash}`
+  const baseUrl = await getBaseUrl()
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Edit QR Code</h1>
-        <p className="text-sm text-muted-foreground">
-          Update the endpoint, note, and design. The tracking link stays the same, so printed codes keep working.
-        </p>
-      </div>
+    <PageContainer width="3xl">
+      <PageHeader
+        title="Edit QR Code"
+        description="Update the endpoint, note, and design. The tracking link stays the same, so printed codes keep working."
+      />
       <QrCodeForm
         action={updateQrCodeAction}
         hiddenId={qrCode.id}
         submitLabel="Save changes"
         pendingLabel="Saving..."
         successMessage="QR code updated."
-        previewValue={previewValue}
+        previewValue={`${baseUrl}/s/${qrCode.urlHash}`}
         defaultValues={{
           leadsTo: qrCode.leadsTo,
           note: qrCode.note,
@@ -51,6 +43,6 @@ export default async function EditQrCodePage({ params }: { params: Promise<{ id:
           bgColor: qrCode.bgColor,
         }}
       />
-    </div>
+    </PageContainer>
   )
 }

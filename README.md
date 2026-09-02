@@ -2,21 +2,25 @@
 
 A self-hosted QR code generator with scan tracking. Create a QR code, hand out
 the short redirect link it produces, and see how many times it's been
-scanned — per code, with a distribution point label so you know where each
-one is deployed.
+scanned — per code. Give each one an optional note so you remember where it's
+deployed.
 
 ## Features
 
 - **QR code generation** — client-side rendering (no server-side file
   storage), downloadable as SVG or high-resolution PNG.
+- **Styled codes** — pick a module shape (square, rounded, dots) and
+  foreground/background colours; the style is baked into the image and its
+  downloads.
 - **Scan tracking** — every code gets a short `/s/[hash]` redirect link;
-  each hit increments a view counter atomically.
+  each human hit increments a view counter atomically (bot and preview-crawler
+  hits are filtered out).
 - **Smart endpoint detection** — paste a URL, phone number, or email address
   as the destination and it's validated and normalized accordingly.
 - **Multi-user** — each account manages its own set of QR codes; email +
-  password authentication.
-- **Editable metadata** — update a code's destination or distribution point
-  after creation without regenerating the QR image itself.
+  password authentication with email confirmation and password reset.
+- **Editable metadata** — update a code's destination, note, or design after
+  creation without regenerating the QR image itself.
 
 ## Tech stack
 
@@ -25,7 +29,8 @@ one is deployed.
 - [Prisma ORM v7](https://www.prisma.io) + PostgreSQL
 - [Auth.js (NextAuth) v5](https://authjs.dev) — credentials-based auth, JWT sessions
 - [Zod](https://zod.dev) for validation
-- [qrcode.react](https://github.com/zpao/qrcode.react) for QR rendering
+- [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) for the QR matrix, rendered to a custom SVG
+- [Nodemailer](https://nodemailer.com) for transactional email
 
 ## Getting started
 
@@ -50,11 +55,14 @@ one is deployed.
    cp .env.example .env
    ```
 
-   | Variable       | Description                                                           |
-   | -------------- | ----------------------------------------------------------------------- |
-   | `PORT`         | Port the dev/start server listens on.                                  |
-   | `DATABASE_URL` | PostgreSQL connection string.                                          |
-   | `AUTH_SECRET`  | Auth.js session secret. Generate one with `openssl rand -base64 32`.   |
+   | Variable                                                            | Description                                                              |
+   | ------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+   | `PORT`                                                              | Port the dev/start server listens on.                                 |
+   | `DATABASE_URL`                                                      | PostgreSQL connection string.                                         |
+   | `APP_URL`                                                           | Public base URL — used for metadata and links in outgoing email.      |
+   | `AUTH_SECRET`                                                       | Auth.js session secret. Generate with `openssl rand -base64 32`.      |
+   | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_SECURE` | Outgoing mail server (email confirmation, password reset). `SMTP_SECURE` is `ssl`, `tls`, or empty. |
+   | `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME`                                | "From" identity on outgoing email (defaults to `SMTP_USER`).          |
 
 3. Apply database migrations:
 
@@ -78,8 +86,9 @@ one is deployed.
 
 ### Run with Docker
 
-Requires only Docker — no local Node/pnpm/Postgres setup. Spins up the app,
-a Postgres database, and applies migrations automatically:
+Requires only Docker — no local Node/pnpm/Postgres setup. Spins up the app
+(a slim standalone build), a Postgres database, and applies migrations
+automatically:
 
 ```bash
 cp .env.example .env
@@ -93,14 +102,15 @@ in `.env`). Data persists in a named Docker volume across restarts.
 
 ## Scripts
 
-| Command             | Description                              |
-| -------------------- | ----------------------------------------- |
-| `pnpm dev`           | Start the dev server (Turbopack).         |
-| `pnpm build`         | Production build.                         |
-| `pnpm start`         | Start the production server.              |
-| `pnpm lint`          | Run ESLint (`--fix`).                     |
-| `pnpm typecheck`     | Type-check without emitting output.       |
-| `pnpm format`        | Format the codebase with Prettier.        |
+| Command             | Description                                        |
+| -------------------- | ------------------------------------------------- |
+| `pnpm dev`           | Start the dev server (Turbopack).                 |
+| `pnpm build`         | Production build.                                 |
+| `pnpm start`         | Start the production server.                      |
+| `pnpm lint`          | Run ESLint with autofix.                          |
+| `pnpm lint:ci`       | Run ESLint without autofix (as CI does).          |
+| `pnpm typecheck`     | Type-check without emitting output.               |
+| `pnpm format`        | Format the codebase with Prettier.                |
 
 ## Project structure
 
@@ -109,8 +119,9 @@ prisma/               Schema, migrations, seed script, generated Prisma client
 src/app/               Routes (App Router)
 src/actions/           Server Actions
 src/schemas/           Zod validation schemas
+src/hooks/             Shared React hooks
 src/components/        React components (ui/ = shadcn primitives, qrcode/ = domain components)
-src/lib/                Shared utilities (Prisma client, endpoint parsing)
+src/lib/                Shared utilities (Prisma client, auth guard, endpoint parsing, logger)
 ```
 
 ## Contributing
