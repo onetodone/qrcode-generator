@@ -21,12 +21,12 @@ export default function DashboardLoading() {
             <Separator className="my-1" />
             <div className="flex items-center justify-between gap-2">
               <div className="flex gap-2">
-                <Skeleton className="h-8 w-12" />
-                <Skeleton className="h-8 w-12" />
+                <Skeleton className="h-7 w-12" />
+                <Skeleton className="h-7 w-12" />
               </div>
               <div className="flex gap-1">
-                <Skeleton className="size-8" />
-                <Skeleton className="size-8" />
+                <Skeleton className="size-7" />
+                <Skeleton className="size-7" />
               </div>
             </div>
           </Card>
