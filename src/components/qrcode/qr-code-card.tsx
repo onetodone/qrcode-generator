@@ -4,8 +4,9 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { PencilIcon, Trash2Icon } from 'lucide-react'
 import type { QrShapeValue } from '@/schemas/qrcode'
-import { TableCell, TableRow } from '@/components/ui/table'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import { SubmitButton } from '@/components/ui/submit-button'
 import {
   AlertDialog,
@@ -23,7 +24,7 @@ import { deleteQrCodeAction } from '@/actions/qrcode'
 // High enough resolution for print materials (posters, booklets).
 const DOWNLOAD_SIZE = 1024
 
-export type QrCodeRowData = {
+export type QrCodeCardData = {
   id: string
   urlHash: string
   note: string
@@ -57,7 +58,7 @@ function randomFileToken(length = 8): string {
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('')
 }
 
-export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
+export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [downloadName] = useState(() => `qrcode-${randomFileToken()}`)
 
@@ -65,7 +66,6 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
     const svg = svgRef.current
     if (!svg) return
 
-    // SVG is resolution-independent, so upsizing the exported copy is free.
     const serialized = new XMLSerializer().serializeToString(upscaledClone(svg))
     const blob = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -96,25 +96,37 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
   }
 
   return (
-    <TableRow>
-      <TableCell>
+    <Card className="px-4">
+      <div className="flex items-start gap-3">
         <QrImage
           ref={svgRef}
           value={qrCode.redirectUrl}
           shape={qrCode.shape}
           fgColor={qrCode.fgColor}
           bgColor={qrCode.bgColor}
-          size={64}
+          size={92}
+          className="shrink-0 rounded-md ring-1 ring-foreground/10"
         />
-      </TableCell>
-      <TableCell>{qrCode.views}</TableCell>
-      <TableCell className="max-w-64 whitespace-normal break-words">
-        <a href={qrCode.leadsTo} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">
-          {qrCode.leadsTo}
-        </a>
-      </TableCell>
-      <TableCell className="max-w-48 whitespace-normal break-words">{qrCode.note || '-'}</TableCell>
-      <TableCell>
+        <div className="min-w-0 h-full flex flex-col flex-1">
+          <a
+            href={qrCode.leadsTo}
+            target="_blank"
+            rel="noreferrer"
+            title={qrCode.leadsTo}
+            className="block truncate font-medium text-primary underline underline-offset-4"
+          >
+            {qrCode.leadsTo}
+          </a>
+          <p title={qrCode.note || undefined} className="mt-0.5 mb-2 line-clamp-2 text-muted-foreground">
+            {qrCode.note || '-'}
+          </p>
+          <p className="mt-auto text-sm text-muted-foreground">
+            <strong>{qrCode.views}</strong> {qrCode.views === 1 ? 'scan' : 'scans'}
+          </p>
+        </div>
+      </div>
+      <Separator className="my-1" />
+      <div className="flex items-center justify-between gap-2">
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={handleDownloadSvg}>
             SVG
@@ -123,8 +135,6 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
             PNG
           </Button>
         </div>
-      </TableCell>
-      <TableCell>
         <div className="flex gap-1">
           <Button
             variant="ghost"
@@ -143,8 +153,8 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete this QR code?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This permanently removes the code for &ldquo;{qrCode.note}&rdquo;. Anyone who scans it afterwards will
-                  get a 404. This can&rsquo;t be undone.
+                  This permanently removes the code. Anyone who scans it afterwards will get a 404. This can&rsquo;t be
+                  undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -158,7 +168,7 @@ export function QrCodeRow({ qrCode }: { qrCode: QrCodeRowData }) {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </TableCell>
-    </TableRow>
+      </div>
+    </Card>
   )
 }

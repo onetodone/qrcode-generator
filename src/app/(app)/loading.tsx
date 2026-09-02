@@ -1,5 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card } from '@/components/ui/card'
 
 export default function DashboardLoading() {
   return (
@@ -8,45 +8,29 @@ export default function DashboardLoading() {
         <h1 className="text-2xl font-semibold">Your QR Codes</h1>
         <Skeleton className="h-9 w-36" />
       </div>
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[80px]">QR Code</TableHead>
-              <TableHead className="w-[80px]">Scanned</TableHead>
-              <TableHead>Leads to</TableHead>
-              <TableHead className="min-w-[200px]">Note</TableHead>
-              <TableHead className="w-[120px]">Downloads</TableHead>
-              <TableHead className="w-[90px]">
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {Array.from({ length: 5 }, (_, index) => (
-              <TableRow key={index}>
-                <TableCell>
-                  <Skeleton className="size-12" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-4 w-8" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-4 w-40" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-4 w-32" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-8 w-20" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-8 w-16" />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }, (_, index) => (
+          <Card key={index} className="px-4">
+            <div className="flex items-start gap-3">
+              <Skeleton className="size-14 shrink-0 rounded-md" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            </div>
+            <Skeleton className="h-4 w-16" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-2">
+                <Skeleton className="h-7 w-14" />
+                <Skeleton className="h-7 w-14" />
+              </div>
+              <div className="flex gap-1">
+                <Skeleton className="size-7" />
+                <Skeleton className="size-7" />
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
     </div>
   )
