@@ -188,7 +188,7 @@ export async function resetPasswordAction(
   const hashedPassword = await bcrypt.hash(parsed.data.newPassword, 10)
   await prisma.user.update({
     where: { id: user.id },
-    data: { password: hashedPassword },
+    data: { password: hashedPassword, passwordChangedAt: new Date() },
   })
 
   return { success: true }

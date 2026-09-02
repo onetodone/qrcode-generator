@@ -22,6 +22,15 @@ export class VerificationTokenInvalidSignin extends CredentialsSignin {
   code = 'verification_token_invalid'
 }
 
+async function passwordChangedAtMs(userId: string): Promise<number | null> {
+  const record = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordChangedAt: true },
+  })
+  if (!record) return null
+  return record.passwordChangedAt?.getTime() ?? 0
+}
+
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   adapter: PrismaAdapter(prisma),
   // Credentials-based auth only supports JWT sessions, not database sessions.
@@ -112,30 +121,28 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     async jwt({ token, user, trigger, session }) {
       if (user) {
         // Just verified in `authorize()` moments ago — no need to re-check.
-        token.id = user.id as string
+        const userId = user.id as string
+        token.id = userId
+        token.passwordChangedAt = (await passwordChangedAtMs(userId)) ?? 0
         return token
       }
 
-      // Triggered by `unstable_update()` from the profile Server Action —
-      // otherwise the JWT would keep the stale name/email until re-login.
-      if (trigger === 'update' && session?.user) {
-        if (session.user.name !== undefined) token.name = session.user.name
-        if (session.user.email !== undefined) token.email = session.user.email
+      if (typeof token.id !== 'string') return token
+      const userId = token.id
+      const issuedFor = typeof token.passwordChangedAt === 'number' ? token.passwordChangedAt : 0
+
+      if (trigger === 'update') {
+        if (session?.user?.name !== undefined) token.name = session.user.name
+        if (session?.user?.email !== undefined) token.email = session.user.email
+        const changedAt = await passwordChangedAtMs(userId)
+        if (changedAt === null) return null
+        token.passwordChangedAt = changedAt
         return token
       }
 
-      // Every other read of an existing JWT: since JWT sessions aren't
-      // re-validated against the DB by default, a deleted account would
-      // otherwise stay "logged in" with a token pointing at nothing, and
-      // every page/action using session.user.id would silently misbehave.
-      // Returning null here revokes the session.
-      if (typeof token.id === 'string') {
-        const stillExists = await prisma.user.findUnique({
-          where: { id: token.id },
-          select: { id: true },
-        })
-        if (!stillExists) return null
-      }
+      const changedAt = await passwordChangedAtMs(userId)
+      if (changedAt === null) return null
+      if (changedAt > issuedFor) return null
 
       return token
     },
