@@ -1,22 +1,18 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@/generated/client'
-import { qrCodeFormSchema } from '@/schemas/qrcode'
+import { qrCodeFormSchema, type QrCodeFormInput } from '@/schemas/qrcode'
 import { generateUrlHash, normalizeLeadsTo } from '@/lib/qrcode'
-
-export type QrCodeFormState = { error?: string; success?: boolean } | undefined
+import { firstZodError, type FormState } from '@/lib/forms'
+import { getSessionUserId } from '@/lib/auth-guard'
 
 const MAX_HASH_ATTEMPTS = 5
 
-export async function createQrCodeAction(_prevState: QrCodeFormState, formData: FormData): Promise<QrCodeFormState> {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return { error: 'You must be signed in.' }
-  }
+const NOT_SIGNED_IN = 'You must be signed in.'
 
+function parseQrCodeForm(formData: FormData): { data: QrCodeFormInput } | { error: string } {
   const parsed = qrCodeFormSchema.safeParse({
     leadsTo: formData.get('leadsTo'),
     note: formData.get('note'),
@@ -24,9 +20,8 @@ export async function createQrCodeAction(_prevState: QrCodeFormState, formData: 
     fgColor: formData.get('fgColor') ?? undefined,
     bgColor: formData.get('bgColor') ?? undefined,
   })
-
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid input.' }
+    return { error: firstZodError(parsed.error) }
   }
 
   const leadsTo = normalizeLeadsTo(parsed.data.leadsTo)
@@ -34,18 +29,21 @@ export async function createQrCodeAction(_prevState: QrCodeFormState, formData: 
     return { error: 'Endpoint must be a valid URL, phone number, or email address.' }
   }
 
+  return { data: { ...parsed.data, leadsTo } }
+}
+
+export async function createQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const userId = await getSessionUserId()
+  if (!userId) return { error: NOT_SIGNED_IN }
+
+  const result = parseQrCodeForm(formData)
+  if ('error' in result) return { error: result.error }
+  const { leadsTo, note, shape, fgColor, bgColor } = result.data
+
   for (let attempt = 1; attempt <= MAX_HASH_ATTEMPTS; attempt++) {
     try {
       await prisma.qrCode.create({
-        data: {
-          userId: session.user.id,
-          urlHash: generateUrlHash(),
-          note: parsed.data.note,
-          leadsTo,
-          shape: parsed.data.shape,
-          fgColor: parsed.data.fgColor,
-          bgColor: parsed.data.bgColor,
-        },
+        data: { userId, urlHash: generateUrlHash(), note, leadsTo, shape, fgColor, bgColor },
       })
       break
     } catch (error) {
@@ -59,44 +57,23 @@ export async function createQrCodeAction(_prevState: QrCodeFormState, formData: 
   return { success: true }
 }
 
-export async function updateQrCodeAction(_prevState: QrCodeFormState, formData: FormData): Promise<QrCodeFormState> {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return { error: 'You must be signed in.' }
-  }
+export async function updateQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const userId = await getSessionUserId()
+  if (!userId) return { error: NOT_SIGNED_IN }
 
   const id = formData.get('id')
   if (typeof id !== 'string' || !id) {
     return { error: 'Invalid request.' }
   }
 
-  const parsed = qrCodeFormSchema.safeParse({
-    leadsTo: formData.get('leadsTo'),
-    note: formData.get('note'),
-    shape: formData.get('shape') ?? undefined,
-    fgColor: formData.get('fgColor') ?? undefined,
-    bgColor: formData.get('bgColor') ?? undefined,
-  })
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid input.' }
-  }
-
-  const leadsTo = normalizeLeadsTo(parsed.data.leadsTo)
-  if (!leadsTo) {
-    return { error: 'Endpoint must be a valid URL, phone number, or email address.' }
-  }
+  const result = parseQrCodeForm(formData)
+  if ('error' in result) return { error: result.error }
+  const { leadsTo, note, shape, fgColor, bgColor } = result.data
 
   // urlHash is intentionally left untouched — the QR image itself never changes.
   const { count } = await prisma.qrCode.updateMany({
-    where: { id, userId: session.user.id },
-    data: {
-      leadsTo,
-      note: parsed.data.note,
-      shape: parsed.data.shape,
-      fgColor: parsed.data.fgColor,
-      bgColor: parsed.data.bgColor,
-    },
+    where: { id, userId },
+    data: { leadsTo, note, shape, fgColor, bgColor },
   })
 
   if (count === 0) {
@@ -108,14 +85,12 @@ export async function updateQrCodeAction(_prevState: QrCodeFormState, formData: 
 }
 
 export async function deleteQrCodeAction(id: string): Promise<void> {
-  const session = await auth()
-  if (!session?.user?.id) {
+  const userId = await getSessionUserId()
+  if (!userId) {
     throw new Error('Unauthorized')
   }
 
-  await prisma.qrCode.deleteMany({
-    where: { id, userId: session.user.id },
-  })
+  await prisma.qrCode.deleteMany({ where: { id, userId } })
 
   revalidatePath('/')
 }

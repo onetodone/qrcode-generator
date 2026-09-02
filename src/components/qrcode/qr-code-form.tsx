@@ -1,10 +1,11 @@
 'use client'
 
-import { useActionState, useEffect, useId, useState } from 'react'
+import { useActionState, useId, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import type { QrCodeFormState } from '@/actions/qrcode'
+import type { FormState } from '@/lib/forms'
+import { useActionResult } from '@/hooks/use-action-result'
 import { DEFAULT_BG_COLOR, DEFAULT_FG_COLOR, QR_SHAPES, QR_SHAPE_LABELS, type QrShapeValue } from '@/schemas/qrcode'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/field'
 import { QrImage } from '@/components/qrcode/qr-image'
 
-type QrCodeFormAction = (prevState: QrCodeFormState, formData: FormData) => Promise<QrCodeFormState>
+type QrCodeFormAction = (prevState: FormState, formData: FormData) => Promise<FormState>
 
 export type QrCodeFormDefaults = {
   leadsTo?: string
@@ -59,15 +60,14 @@ export function QrCodeForm({
   const [fgColor, setFgColor] = useState(defaultValues?.fgColor ?? DEFAULT_FG_COLOR)
   const [bgColor, setBgColor] = useState(defaultValues?.bgColor ?? DEFAULT_BG_COLOR)
 
-  const [state, formAction, pending] = useActionState<QrCodeFormState, FormData>(action, undefined)
+  const [state, formAction, pending] = useActionState<FormState, FormData>(action, undefined)
 
-  useEffect(() => {
-    if (state?.success) {
+  useActionResult(state, {
+    onSuccess: () => {
       toast.success(successMessage)
       router.push('/')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state])
+    },
+  })
 
   return (
     <Card>

@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { forgotPasswordAction, type ResetPasswordFormState } from '@/actions/auth'
+import { forgotPasswordAction } from '@/actions/auth'
+import type { FormState } from '@/lib/forms'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +11,7 @@ import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/compo
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState('')
-  const [state, action, pending] = useActionState<ResetPasswordFormState, FormData>(forgotPasswordAction, undefined)
+  const [state, action, pending] = useActionState<FormState, FormData>(forgotPasswordAction, undefined)
 
   if (state?.success) {
     return (

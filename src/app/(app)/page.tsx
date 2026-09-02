@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { PlusIcon } from 'lucide-react'
-import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { getBaseUrl } from '@/lib/request'
+import { requireUserId } from '@/lib/auth-guard'
 import { Button } from '@/components/ui/button'
+import { PageContainer, PageHeader } from '@/components/page-header'
 import { QrCodeGrid } from '@/components/qrcode/qr-code-grid'
 
 export const metadata: Metadata = {
@@ -13,40 +13,30 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  // Independent reads, fetched together rather than sequentially — the
-  // request headers don't depend on the session.
-  const [session, requestHeaders] = await Promise.all([auth(), headers()])
-  if (!session?.user?.id) {
-    redirect('/login')
-  }
+  const userId = await requireUserId()
 
-  const qrCodes = await prisma.qrCode.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: 'desc' },
-  })
+  const [qrCodes, baseUrl] = await Promise.all([
+    prisma.qrCode.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+    getBaseUrl(),
+  ])
 
-  // Derived from the incoming request rather than a static env var, so the
-  // redirect links are correct whether hit directly (localhost:PORT) or
-  // through a reverse proxy on a public domain, without needing to keep an
-  // APP_URL setting in sync with the actual deployment.
-  const proto = requestHeaders.get('x-forwarded-proto') ?? 'http'
-  const host = requestHeaders.get('host')
-  const appUrl = `${proto}://${host}`
   const rows = qrCodes.map((qrCode) => ({
     ...qrCode,
-    redirectUrl: `${appUrl}/s/${qrCode.urlHash}`,
+    redirectUrl: `${baseUrl}/s/${qrCode.urlHash}`,
   }))
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Your QR Codes</h1>
-        <Button nativeButton={false} render={<Link href="/qr-codes/new" />}>
-          <PlusIcon />
-          Add QR Code
-        </Button>
-      </div>
+    <PageContainer width="6xl">
+      <PageHeader
+        title="Your QR Codes"
+        action={
+          <Button nativeButton={false} render={<Link href="/qr-codes/new" />}>
+            <PlusIcon />
+            Add QR Code
+          </Button>
+        }
+      />
       <QrCodeGrid qrCodes={rows} />
-    </div>
+    </PageContainer>
   )
 }

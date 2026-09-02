@@ -1,8 +1,8 @@
 import { phone } from 'phone'
 import * as z from 'zod'
+import { randomToken } from '@/lib/random'
 
 const HASH_LENGTH = 32
-const HASH_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
 // General E.164 shape (ITU-T): "+" then 7-15 digits, no leading 0. Used as a
 // fallback when the `phone` library can't map the input to a real numbering
@@ -74,6 +74,5 @@ export function normalizeLeadsTo(raw: string): string | null {
 }
 
 export function generateUrlHash(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(HASH_LENGTH))
-  return Array.from(bytes, (byte) => HASH_ALPHABET[byte % HASH_ALPHABET.length]).join('')
+  return randomToken(HASH_LENGTH)
 }

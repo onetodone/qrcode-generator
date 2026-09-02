@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { AuthLayout } from '@/components/auth-card'
 import { ForgotPasswordForm } from './forgot-password-form'
 
 export const metadata: Metadata = {
@@ -7,8 +8,8 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="flex min-h-svh items-center justify-center p-4">
+    <AuthLayout>
       <ForgotPasswordForm />
-    </div>
+    </AuthLayout>
   )
 }

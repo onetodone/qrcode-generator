@@ -1,20 +1,20 @@
 'use server'
 
-import bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
-import { auth, unstable_update } from '@/auth'
+import { unstable_update } from '@/auth'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { changePasswordSchema, updateProfileSchema } from '@/schemas/profile'
+import { firstZodError, type FormState } from '@/lib/forms'
+import { hashPassword, verifyPassword } from '@/lib/password'
+import { getSessionUserId } from '@/lib/auth-guard'
 
-export type ProfileFormState = { error?: string; success?: boolean } | undefined
+const NOT_SIGNED_IN = 'You must be signed in.'
 
-export async function updateProfileAction(_prevState: ProfileFormState, formData: FormData): Promise<ProfileFormState> {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return { error: 'You must be signed in.' }
-  }
+export async function updateProfileAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const userId = await getSessionUserId()
+  if (!userId) return { error: NOT_SIGNED_IN }
 
   const parsed = updateProfileSchema.safeParse({
     name: formData.get('name'),
@@ -22,11 +22,11 @@ export async function updateProfileAction(_prevState: ProfileFormState, formData
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid input.' }
+    return { error: firstZodError(parsed.error) }
   }
 
   const currentUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: { email: true, pendingEmail: true },
   })
   const emailChanged = currentUser?.email !== parsed.data.email
@@ -34,7 +34,7 @@ export async function updateProfileAction(_prevState: ProfileFormState, formData
   if (emailChanged) {
     const existing = await prisma.user.findFirst({
       where: {
-        id: { not: session.user.id },
+        id: { not: userId },
         OR: [{ email: parsed.data.email }, { pendingEmail: parsed.data.email }],
       },
     })
@@ -44,7 +44,7 @@ export async function updateProfileAction(_prevState: ProfileFormState, formData
   }
 
   await prisma.user.update({
-    where: { id: session.user.id },
+    where: { id: userId },
     data: {
       name: parsed.data.name,
       // The real `email`/`emailVerified` stay untouched until the new
@@ -73,14 +73,9 @@ export async function updateProfileAction(_prevState: ProfileFormState, formData
   return { success: true }
 }
 
-export async function changePasswordAction(
-  _prevState: ProfileFormState,
-  formData: FormData,
-): Promise<ProfileFormState> {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return { error: 'You must be signed in.' }
-  }
+export async function changePasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const userId = await getSessionUserId()
+  if (!userId) return { error: NOT_SIGNED_IN }
 
   const parsed = changePasswordSchema.safeParse({
     currentPassword: formData.get('currentPassword'),
@@ -89,23 +84,22 @@ export async function changePasswordAction(
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid input.' }
+    return { error: firstZodError(parsed.error) }
   }
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } })
+  const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) {
     return { error: 'User not found.' }
   }
 
-  const currentPasswordValid = await bcrypt.compare(parsed.data.currentPassword, user.password)
+  const currentPasswordValid = await verifyPassword(parsed.data.currentPassword, user.password)
   if (!currentPasswordValid) {
     return { error: 'Current password is incorrect.' }
   }
 
-  const hashedPassword = await bcrypt.hash(parsed.data.newPassword, 10)
   await prisma.user.update({
-    where: { id: session.user.id },
-    data: { password: hashedPassword, passwordChangedAt: new Date() },
+    where: { id: userId },
+    data: { password: await hashPassword(parsed.data.newPassword), passwordChangedAt: new Date() },
   })
 
   await unstable_update({ user: {} })

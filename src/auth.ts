@@ -1,11 +1,11 @@
 import NextAuth, { CredentialsSignin } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@auth/prisma-adapter'
-import bcrypt from 'bcryptjs'
 import { Prisma, VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { loginSchema } from '@/schemas/auth'
+import { verifyPassword } from '@/lib/password'
 import { logger } from '@/lib/logger'
 
 export class EmailNotVerifiedSignin extends CredentialsSignin {
@@ -107,7 +107,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         })
         if (!user) return null
 
-        const passwordsMatch = await bcrypt.compare(parsed.data.password, user.password)
+        const passwordsMatch = await verifyPassword(parsed.data.password, user.password)
         if (!passwordsMatch) return null
 
         if (!user.emailVerified) {

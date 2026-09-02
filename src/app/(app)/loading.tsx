@@ -1,13 +1,11 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card } from '@/components/ui/card'
+import { PageContainer, PageHeader } from '@/components/page-header'
 
 export default function DashboardLoading() {
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Your QR Codes</h1>
-        <Skeleton className="h-9 w-36" />
-      </div>
+    <PageContainer width="6xl">
+      <PageHeader title="Your QR Codes" action={<Skeleton className="h-9 w-36" />} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }, (_, index) => (
           <Card key={index} className="px-4">
@@ -32,6 +30,6 @@ export default function DashboardLoading() {
           </Card>
         ))}
       </div>
-    </div>
+    </PageContainer>
   )
 }

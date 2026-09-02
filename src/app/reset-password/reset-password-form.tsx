@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { resetPasswordAction, type ResetPasswordFormState } from '@/actions/auth'
+import { resetPasswordAction } from '@/actions/auth'
+import type { FormState } from '@/lib/forms'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,7 +12,7 @@ import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/compo
 export function ResetPasswordForm({ token }: { token: string }) {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [state, action, pending] = useActionState<ResetPasswordFormState, FormData>(resetPasswordAction, undefined)
+  const [state, action, pending] = useActionState<FormState, FormData>(resetPasswordAction, undefined)
 
   if (state?.success) {
     return (

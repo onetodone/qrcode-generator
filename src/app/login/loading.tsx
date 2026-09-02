@@ -1,9 +1,10 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { AuthLayout } from '@/components/auth-card'
 
 export default function LoginLoading() {
   return (
-    <div className="flex min-h-svh items-center justify-center p-4">
+    <AuthLayout>
       <Card className="w-full max-w-sm">
         <CardHeader>
           <Skeleton className="h-6 w-24" />
@@ -22,6 +23,6 @@ export default function LoginLoading() {
           <Skeleton className="mx-auto h-4 w-40" />
         </CardContent>
       </Card>
-    </div>
+    </AuthLayout>
   )
 }

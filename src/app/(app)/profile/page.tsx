@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
-import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { requireSession } from '@/lib/auth-guard'
+import { PageContainer, PageHeader } from '@/components/page-header'
 import { ProfileForm } from './profile-form'
 import { ChangePasswordForm } from './change-password-form'
 
@@ -10,10 +10,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ProfilePage() {
-  const session = await auth()
-  if (!session?.user?.id) {
-    redirect('/login')
-  }
+  const session = await requireSession()
 
   // Read live from the DB rather than trusting the JWT — the session doesn't
   // carry emailVerified, and it wouldn't reflect a change made this request.
@@ -23,11 +20,8 @@ export default async function ProfilePage() {
   })
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="text-sm text-muted-foreground">Manage your account details.</p>
-      </div>
+    <PageContainer>
+      <PageHeader title="Profile" description="Manage your account details." />
       <ProfileForm
         defaultName={session.user.name ?? ''}
         defaultEmail={session.user.email ?? ''}
@@ -35,6 +29,6 @@ export default async function ProfilePage() {
         pendingEmail={user?.pendingEmail ?? null}
       />
       <ChangePasswordForm />
-    </div>
+    </PageContainer>
   )
 }

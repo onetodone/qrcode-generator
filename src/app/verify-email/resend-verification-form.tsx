@@ -2,7 +2,9 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { resendVerificationEmailAction, type ResendVerificationFormState } from '@/actions/auth'
+import { resendVerificationEmailAction } from '@/actions/auth'
+import type { FormState } from '@/lib/forms'
+import { useActionResult } from '@/hooks/use-action-result'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -19,10 +21,7 @@ export function ResendVerificationForm({
   className?: string
   children?: React.ReactNode
 }) {
-  const [state, action, pending] = useActionState<ResendVerificationFormState, FormData>(
-    resendVerificationEmailAction,
-    undefined,
-  )
+  const [state, action, pending] = useActionState<FormState, FormData>(resendVerificationEmailAction, undefined)
 
   const [secondsLeft, setSecondsLeft] = useState(COOLDOWN_SECONDS)
 
@@ -32,14 +31,10 @@ export function ResendVerificationForm({
     return () => clearTimeout(timer)
   }, [secondsLeft])
 
-  useEffect(() => {
-    if (state?.success) {
-      toast.success('Confirmation email sent.')
-    }
-    if (state?.error) {
-      toast.error(state.error)
-    }
-  }, [state])
+  useActionResult(state, {
+    onSuccess: () => toast.success('Confirmation email sent.'),
+    onError: (message) => toast.error(message),
+  })
 
   const label = pending
     ? 'Sending...'

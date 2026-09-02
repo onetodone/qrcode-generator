@@ -1,9 +1,11 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { updateProfileAction, type ProfileFormState } from '@/actions/profile'
+import { updateProfileAction } from '@/actions/profile'
+import type { FormState } from '@/lib/forms'
+import { useActionResult } from '@/hooks/use-action-result'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,15 +27,14 @@ export function ProfileForm({
   const [name, setName] = useState(defaultName)
   const [email, setEmail] = useState(defaultEmail)
   const router = useRouter()
-  const [state, action, pending] = useActionState<ProfileFormState, FormData>(updateProfileAction, undefined)
+  const [state, action, pending] = useActionState<FormState, FormData>(updateProfileAction, undefined)
 
-  useEffect(() => {
-    if (state?.success) {
+  useActionResult(state, {
+    onSuccess: () => {
       toast.success('Profile updated.')
       router.refresh()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state])
+    },
+  })
 
   return (
     <Card>

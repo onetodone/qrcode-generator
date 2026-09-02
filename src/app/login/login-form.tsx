@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { loginAction, type AuthFormState } from '@/actions/auth'
+import { loginAction } from '@/actions/auth'
+import type { FormState } from '@/lib/forms'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,7 +14,7 @@ export function LoginForm() {
   // uncontrolled fields after any Server Action completes, error or not.
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [state, action, pending] = useActionState<AuthFormState, FormData>(loginAction, undefined)
+  const [state, action, pending] = useActionState<FormState, FormData>(loginAction, undefined)
 
   return (
     <Card className="w-full max-w-sm">
