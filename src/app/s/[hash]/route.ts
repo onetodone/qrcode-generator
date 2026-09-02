@@ -1,12 +1,12 @@
 import { after, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
+import { isbot } from 'isbot'
 import { prisma } from '@/lib/prisma'
-import { Prisma } from '@/generated/client'
-import { logRequest } from '@/lib/logger'
+import { logger, logRequest } from '@/lib/logger'
 import { clientIpFromHeaders } from '@/lib/request'
 
-export async function GET(_request: Request, { params }: { params: Promise<{ hash: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ hash: string }> }) {
   const start = performance.now()
   const { hash } = await params
   const requestHeaders = await headers()
@@ -14,7 +14,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ has
   let status = 500
   after(() => {
     logRequest({
-      method: 'GET',
+      method: request.method,
       path: `/s/${hash}`,
       ip: clientIpFromHeaders(requestHeaders),
       status,
@@ -22,19 +22,30 @@ export async function GET(_request: Request, { params }: { params: Promise<{ has
     })
   })
 
-  try {
-    const qrCode = await prisma.qrCode.update({
-      where: { urlHash: hash },
-      data: { views: { increment: 1 } },
-    })
+  const qrCode = await prisma.qrCode.findUnique({
+    where: { urlHash: hash },
+    select: { leadsTo: true },
+  })
 
-    status = 307
-    return NextResponse.redirect(qrCode.leadsTo)
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      status = 404
-      notFound()
-    }
-    throw error
+  if (!qrCode) {
+    status = 404
+    notFound()
   }
+
+  status = 307
+
+  if (request.method === 'GET' && !isbot(requestHeaders.get('user-agent') ?? '')) {
+    after(async () => {
+      try {
+        await prisma.qrCode.update({
+          where: { urlHash: hash },
+          data: { views: { increment: 1 } },
+        })
+      } catch (error) {
+        logger.error('qr.view_increment_failed', { error, hash })
+      }
+    })
+  }
+
+  return NextResponse.redirect(qrCode.leadsTo)
 }
