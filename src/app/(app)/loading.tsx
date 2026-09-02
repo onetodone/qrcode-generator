@@ -6,7 +6,7 @@ import { PageContainer, PageHeader } from '@/components/page-header'
 export default function DashboardLoading() {
   return (
     <PageContainer width="6xl">
-      <PageHeader title="Your QR Codes" action={<Skeleton className="h-9 w-36" />} />
+      <PageHeader title="Your QR Codes" action={<Skeleton className="h-8 w-36" />} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }, (_, index) => (
           <Card key={index} className="px-4">
