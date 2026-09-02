@@ -20,6 +20,9 @@ export async function createQrCodeAction(_prevState: QrCodeFormState, formData: 
   const parsed = qrCodeFormSchema.safeParse({
     leadsTo: formData.get('leadsTo'),
     note: formData.get('note'),
+    shape: formData.get('shape') ?? undefined,
+    fgColor: formData.get('fgColor') ?? undefined,
+    bgColor: formData.get('bgColor') ?? undefined,
   })
 
   if (!parsed.success) {
@@ -39,6 +42,9 @@ export async function createQrCodeAction(_prevState: QrCodeFormState, formData: 
           urlHash: generateUrlHash(),
           note: parsed.data.note,
           leadsTo,
+          shape: parsed.data.shape,
+          fgColor: parsed.data.fgColor,
+          bgColor: parsed.data.bgColor,
         },
       })
       break
@@ -67,6 +73,9 @@ export async function updateQrCodeAction(_prevState: QrCodeFormState, formData: 
   const parsed = qrCodeFormSchema.safeParse({
     leadsTo: formData.get('leadsTo'),
     note: formData.get('note'),
+    shape: formData.get('shape') ?? undefined,
+    fgColor: formData.get('fgColor') ?? undefined,
+    bgColor: formData.get('bgColor') ?? undefined,
   })
 
   if (!parsed.success) {
@@ -81,7 +90,13 @@ export async function updateQrCodeAction(_prevState: QrCodeFormState, formData: 
   // urlHash is intentionally left untouched — the QR image itself never changes.
   const { count } = await prisma.qrCode.updateMany({
     where: { id, userId: session.user.id },
-    data: { leadsTo, note: parsed.data.note },
+    data: {
+      leadsTo,
+      note: parsed.data.note,
+      shape: parsed.data.shape,
+      fgColor: parsed.data.fgColor,
+      bgColor: parsed.data.bgColor,
+    },
   })
 
   if (count === 0) {

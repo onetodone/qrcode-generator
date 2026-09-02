@@ -61,12 +61,21 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+enum QrShape {
+  SQUARE
+  ROUNDED
+  DOTS
+}
+
 model QrCode {
   id        String   @id @default(cuid())
   userId    String
   urlHash   String   @unique @db.VarChar(32)
   note      String
   leadsTo   String
+  shape     QrShape  @default(SQUARE)
+  fgColor   String   @default("#000000")
+  bgColor   String   @default("#ffffff")
   views     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
