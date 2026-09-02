@@ -7,13 +7,22 @@ import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { emailSchema, loginSchema, registerSchema, resetPasswordSchema } from '@/schemas/auth'
+import { getClientIp, rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 
 export type AuthFormState = { error?: string } | undefined
 export type ResendVerificationFormState = { error?: string; success?: boolean } | undefined
 export type ResetPasswordFormState = { error?: string; success?: boolean } | undefined
 
+const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
+const ONE_HOUR_MS = 60 * 60 * 1000
+
 export async function loginAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const login = rateLimit(`login:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
+  if (!login.ok) {
+    return { error: tooManyAttemptsMessage(login.retryAfterMs) }
+  }
+
   const parsed = loginSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
@@ -45,6 +54,11 @@ export async function logoutAction(): Promise<void> {
 }
 
 export async function registerAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const register = rateLimit(`register:${await getClientIp()}`, { limit: 5, windowMs: ONE_HOUR_MS })
+  if (!register.ok) {
+    return { error: tooManyAttemptsMessage(register.retryAfterMs) }
+  }
+
   const parsed = registerSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),
@@ -81,6 +95,11 @@ export async function resendVerificationEmailAction(
   _prevState: ResendVerificationFormState,
   formData: FormData,
 ): Promise<ResendVerificationFormState> {
+  const resend = rateLimit(`resend-verification:${await getClientIp()}`, { limit: 5, windowMs: FIFTEEN_MINUTES_MS })
+  if (!resend.ok) {
+    return { error: tooManyAttemptsMessage(resend.retryAfterMs) }
+  }
+
   const parsed = emailSchema.safeParse(formData.get('email'))
   if (!parsed.success) {
     return { error: 'Invalid email address.' }
@@ -108,6 +127,11 @@ export async function forgotPasswordAction(
   _prevState: ResetPasswordFormState,
   formData: FormData,
 ): Promise<ResetPasswordFormState> {
+  const forgot = rateLimit(`forgot-password:${await getClientIp()}`, { limit: 5, windowMs: FIFTEEN_MINUTES_MS })
+  if (!forgot.ok) {
+    return { error: tooManyAttemptsMessage(forgot.retryAfterMs) }
+  }
+
   const parsed = emailSchema.safeParse(formData.get('email'))
   if (!parsed.success) {
     return { error: 'Please enter a valid email address.' }
@@ -128,6 +152,11 @@ export async function resetPasswordAction(
   _prevState: ResetPasswordFormState,
   formData: FormData,
 ): Promise<ResetPasswordFormState> {
+  const reset = rateLimit(`reset-password:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
+  if (!reset.ok) {
+    return { error: tooManyAttemptsMessage(reset.retryAfterMs) }
+  }
+
   const parsed = resetPasswordSchema.safeParse({
     token: formData.get('token'),
     newPassword: formData.get('newPassword'),
