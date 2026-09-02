@@ -1,5 +1,3 @@
-import { headers } from 'next/headers'
-
 // Fixed-window rate limiter, process-local. The app runs as a single container
 // (see docker-compose.yml), so an in-memory store is enough — state is lost on
 // restart, which only widens an active abuse window by the few seconds a
@@ -53,19 +51,4 @@ export function rateLimit(key: string, { limit, windowMs }: { limit: number; win
 export function tooManyAttemptsMessage(retryAfterMs: number): string {
   const minutes = Math.max(1, Math.ceil(retryAfterMs / 60_000))
   return `Too many attempts. Please try again in about ${minutes} minute${minutes === 1 ? '' : 's'}.`
-}
-
-/**
- * Best-effort client IP for rate-limit keys. Behind the reverse proxy this app
- * runs under, `x-forwarded-for` is always set; the fallbacks keep the limiter
- * working on direct/local hits. Unidentifiable callers share one bucket.
- */
-export async function getClientIp(): Promise<string> {
-  const headerList = await headers()
-
-  const forwardedFor = headerList.get('x-forwarded-for')
-  const firstForwarded = forwardedFor?.split(',')[0]?.trim()
-  if (firstForwarded) return firstForwarded
-
-  return headerList.get('x-real-ip')?.trim() || 'unknown'
 }

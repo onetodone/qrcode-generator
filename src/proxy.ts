@@ -1,20 +1,35 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { logRequest } from '@/lib/logger'
+import { clientIpFromHeaders } from '@/lib/request'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password']
 
 export default auth((req) => {
+  const start = performance.now()
   const { nextUrl } = req
   const isLoggedIn = Boolean(req.auth)
   const isPublicOnlyRoute = publicOnlyRoutes.some((route) => nextUrl.pathname.startsWith(route))
 
+  let response: NextResponse | undefined
   if (!isLoggedIn && !isPublicOnlyRoute) {
-    return NextResponse.redirect(new URL('/login', nextUrl))
+    response = NextResponse.redirect(new URL('/login', nextUrl))
+  } else if (isLoggedIn && isPublicOnlyRoute) {
+    response = NextResponse.redirect(new URL('/', nextUrl))
   }
 
-  if (isLoggedIn && isPublicOnlyRoute) {
-    return NextResponse.redirect(new URL('/', nextUrl))
-  }
+  after(() => {
+    logRequest({
+      method: req.method,
+      path: nextUrl.pathname + nextUrl.search,
+      ip: clientIpFromHeaders(req.headers),
+      userId: req.auth?.user?.id ?? null,
+      status: response?.status,
+      durationMs: performance.now() - start,
+    })
+  })
+
+  return response
 })
 
 export const config = {

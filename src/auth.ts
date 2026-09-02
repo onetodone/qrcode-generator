@@ -6,6 +6,7 @@ import { Prisma, VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { loginSchema } from '@/schemas/auth'
+import { logger } from '@/lib/logger'
 
 export class EmailNotVerifiedSignin extends CredentialsSignin {
   code = 'email_not_verified'
@@ -30,7 +31,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   logger: {
     error(error) {
       if (error instanceof CredentialsSignin) return
-      console.error(error)
+      logger.error('auth.error', { error })
     },
   },
   providers: [

@@ -7,7 +7,8 @@ import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { emailSchema, loginSchema, registerSchema, resetPasswordSchema } from '@/schemas/auth'
-import { getClientIp, rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
+import { rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
+import { getClientIp } from '@/lib/request'
 import bcrypt from 'bcryptjs'
 
 export type AuthFormState = { error?: string } | undefined
