@@ -19,8 +19,8 @@ export type QrImageProps = {
 // ROUNDED — a full-bleed square with strongly rounded corners, so neighbouring
 //           modules join into soft blobs (clearly distinct from DOTS).
 const DOT_RADIUS = 0.4
-const ROUNDED_BLEED = 0.02
-const ROUNDED_RADIUS = 0.3
+const ROUNDED_BLEED = 0.04
+const ROUNDED_RADIUS = 0.8
 
 export function QrImage({
   value,
