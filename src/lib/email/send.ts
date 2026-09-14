@@ -1,11 +1,11 @@
-import type { Attachment } from 'nodemailer/lib/mailer'
+import type Mail from 'nodemailer/lib/mailer'
 import { logger } from '@/lib/logger'
 import { getSmtpConfig } from './config'
 import { minifyHtml } from './minify'
 import { renderEmailTemplate } from './template'
 import { getTransporter } from './transporter'
 
-export type EmailAttachment = Attachment
+export type EmailAttachment = Mail.Attachment
 
 export interface SendEmailParams {
   to: string[]
