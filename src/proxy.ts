@@ -5,18 +5,45 @@ import { clientIpFromHeaders } from '@/lib/request'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password']
 
+const isDev = process.env.NODE_ENV !== 'production'
+
+function buildCsp(nonce: string): string {
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src 'self'${isDev ? ' ws:' : ''}`,
+    "worker-src 'self' blob:",
+  ].join('; ')
+}
+
 export default auth((req) => {
   const start = performance.now()
   const { nextUrl } = req
   const isLoggedIn = Boolean(req.auth)
   const isPublicOnlyRoute = publicOnlyRoutes.some((route) => nextUrl.pathname.startsWith(route))
 
-  let response: NextResponse | undefined
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const csp = buildCsp(nonce)
+  const requestHeaders = new Headers(req.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('Content-Security-Policy', csp)
+
+  let response: NextResponse
   if (!isLoggedIn && !isPublicOnlyRoute) {
     response = NextResponse.redirect(new URL('/login', nextUrl))
   } else if (isLoggedIn && isPublicOnlyRoute) {
     response = NextResponse.redirect(new URL('/', nextUrl))
+  } else {
+    response = NextResponse.next({ request: { headers: requestHeaders } })
   }
+  response.headers.set('Content-Security-Policy', csp)
 
   after(() => {
     logRequest({
@@ -24,7 +51,7 @@ export default auth((req) => {
       path: nextUrl.pathname + nextUrl.search,
       ip: clientIpFromHeaders(req.headers),
       userId: req.auth?.user?.id ?? null,
-      status: response?.status,
+      status: response.status,
       durationMs: performance.now() - start,
     })
   })
