@@ -43,7 +43,7 @@ function isValidEmail(value: string): boolean {
 }
 
 function isLikelyDomain(value: string): boolean {
-  const host = value.split(/[/?#]/, 1)[0]
+  const host = value.split(/[/?#]/, 1)[0] ?? ''
   return DOMAIN_PATTERN.test(host)
 }
 

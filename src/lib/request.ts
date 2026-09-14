@@ -6,7 +6,8 @@ export function clientIpFromHeaders(headerList: Headers): string {
     ?.split(',')
     .map((ip) => ip.trim())
     .filter(Boolean)
-  if (hops?.length) return hops[hops.length - 1]
+  const rightmost = hops?.at(-1)
+  if (rightmost) return rightmost
 
   return headerList.get('x-real-ip')?.trim() || 'unknown'
 }

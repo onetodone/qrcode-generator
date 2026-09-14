@@ -51,7 +51,7 @@ export function QrImage({
     }
 
     for (let col = 0; col < count; col++) {
-      const dark = modules[row][col]
+      const dark = modules[row]?.[col]
       const asSquare = dark && (shape === 'SQUARE' || isStructuralModule(row, col, count))
 
       if (asSquare) {
