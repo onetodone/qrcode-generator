@@ -3,6 +3,10 @@ import bcrypt from 'bcryptjs'
 import { PrismaClient } from './generated/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('Refusing to run prisma/seed.ts against a production environment (NODE_ENV=production).')
+}
+
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
 const prisma = new PrismaClient({ adapter })
 
