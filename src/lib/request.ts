@@ -1,8 +1,12 @@
 import { headers } from 'next/headers'
 
 export function clientIpFromHeaders(headerList: Headers): string {
-  const forwardedFor = headerList.get('x-forwarded-for')?.split(',')[0]?.trim()
-  if (forwardedFor) return forwardedFor
+  const hops = headerList
+    .get('x-forwarded-for')
+    ?.split(',')
+    .map((ip) => ip.trim())
+    .filter(Boolean)
+  if (hops?.length) return hops[hops.length - 1]
 
   return headerList.get('x-real-ip')?.trim() || 'unknown'
 }
