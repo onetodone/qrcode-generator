@@ -5,22 +5,35 @@ import { isbot } from 'isbot'
 import { prisma } from '@/lib/prisma'
 import { logger, logRequest } from '@/lib/logger'
 import { clientIpFromHeaders } from '@/lib/request'
+import { rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
+
+const REDIRECT_RATE_LIMIT = { limit: 60, windowMs: 60_000 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ hash: string }> }) {
   const start = performance.now()
   const { hash } = await params
   const requestHeaders = await headers()
+  const ip = clientIpFromHeaders(requestHeaders)
 
   let status = 500
   after(() => {
     logRequest({
       method: request.method,
       path: `/s/${hash}`,
-      ip: clientIpFromHeaders(requestHeaders),
+      ip,
       status,
       durationMs: performance.now() - start,
     })
   })
+
+  const limited = rateLimit(`qr-redirect:${ip}`, REDIRECT_RATE_LIMIT)
+  if (!limited.ok) {
+    status = 429
+    return new NextResponse(tooManyAttemptsMessage(limited.retryAfterMs), {
+      status: 429,
+      headers: { 'Retry-After': String(Math.ceil(limited.retryAfterMs / 1000)) },
+    })
+  }
 
   const qrCode = await prisma.qrCode.findUnique({
     where: { urlHash: hash },
