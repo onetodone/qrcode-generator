@@ -153,12 +153,12 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <form action={deleteQrCodeAction.bind(null, qrCode.id)} className="contents">
                   <SubmitButton data-slot="alert-dialog-action" variant="destructive" pendingLabel="Deleting...">
                     Delete
                   </SubmitButton>
                 </form>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
