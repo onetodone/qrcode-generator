@@ -39,6 +39,7 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required — see .env.example}
       PORT: ${PORT:-3000}
       GATAG_ID: ${GATAG_ID:-}
+      CSP_CONNECT_SRC_EXTRA: ${CSP_CONNECT_SRC_EXTRA:-}
     depends_on:
       postgres:
         condition: service_healthy

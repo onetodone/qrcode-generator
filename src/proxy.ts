@@ -6,6 +6,7 @@ import { clientIpFromHeaders } from '@/lib/request'
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password']
 
 const isDev = process.env.NODE_ENV !== 'production'
+const cspConnectSrcExtra = process.env.CSP_CONNECT_SRC_EXTRA?.trim() ?? ''
 
 function buildCsp(nonce: string): string {
   return [
@@ -18,7 +19,7 @@ function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    `connect-src 'self'${isDev ? ' ws:' : ''}`,
+    `connect-src 'self'${cspConnectSrcExtra ? ` ${cspConnectSrcExtra}` : ''}${isDev ? ' ws:' : ''}`,
     "worker-src 'self' blob:",
   ].join('; ')
 }

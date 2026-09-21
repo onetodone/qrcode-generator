@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import { GoogleAnalytics } from '@next/third-parties/google'
+import { AnalyticsIdentifier } from '@/components/analytics-identifier'
+import { getSessionUserId } from '@/lib/auth-guard'
 import './globals.css'
 
 const geistSans = Geist({
@@ -39,14 +41,21 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: LayoutProps<'/'>) {
+export default async function RootLayout({ children }: LayoutProps<'/'>) {
+  const userId = gaTagId ? await getSessionUserId() : null
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         {children}
         <Toaster />
       </body>
-      {gaTagId && <GoogleAnalytics gaId={gaTagId} />}
+      {gaTagId && (
+        <>
+          <GoogleAnalytics gaId={gaTagId} />
+          <AnalyticsIdentifier userId={userId} />
+        </>
+      )}
     </html>
   )
 }
