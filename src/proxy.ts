@@ -63,10 +63,11 @@ export default auth((req) => {
 export const config = {
   // Skip the public /s/[hash] redirect route, the auth API, static assets, and
   // the metadata file-convention routes (favicon/icon/apple-icon/manifest/OG
-  // image) — these must stay reachable pre-login for browsers, PWA installers,
-  // link-preview crawlers, and (for logo.png) email clients rendering the
-  // verification email's logo for a not-yet-logged-in recipient.
+  // image/sitemap/robots) — these must stay reachable pre-login for browsers,
+  // PWA installers, link-preview crawlers, search-engine crawlers (sitemap.xml,
+  // robots.txt — they never have a session), and (for logo.png) email clients
+  // rendering the verification email's logo for a not-yet-logged-in recipient.
   matcher: [
-    '/((?!api|s/|_next/static|_next/image|favicon\\.ico|icon\\.(?:svg|png)|apple-icon\\.png|opengraph-image\\.jpg|manifest\\.json|web-app-manifest-.*\\.png|logo\\.png).*)',
+    '/((?!api|s/|_next/static|_next/image|favicon\\.ico|icon\\.(?:svg|png)|apple-icon\\.png|opengraph-image\\.jpg|manifest\\.json|sitemap\\.xml|robots\\.txt|web-app-manifest-.*\\.png|logo\\.png).*)',
   ],
 }
