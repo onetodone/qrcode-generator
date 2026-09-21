@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
-import { SpeedInsights } from '@vercel/speed-insights/next'
+import { GoogleAnalytics } from '@next/third-parties/google'
 import './globals.css'
 
 const geistSans = Geist({
@@ -18,6 +18,8 @@ const appUrl =
   process.env.APP_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ??
   'http://localhost:3000'
+
+const gaTagId = process.env.GATAG_ID ?? ''
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -43,8 +45,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       <body className="min-h-full flex flex-col">
         {children}
         <Toaster />
-        <SpeedInsights />
       </body>
+      {gaTagId && <GoogleAnalytics gaId={gaTagId} />}
     </html>
   )
 }
