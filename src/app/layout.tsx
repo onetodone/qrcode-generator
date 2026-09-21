@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 const appUrl =
   process.env.APP_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ??
-  'http://localhost:3000'
+  `http://localhost:${process.env.PORT ?? 3000}`
 
 const gaTagId = process.env.GATAG_ID ?? ''
 
