@@ -38,6 +38,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-qrcode_generator}?schema=public
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required — see .env.example}
       PORT: ${PORT:-3000}
+      GATAG_ID: ${GATAG_ID:-}
     depends_on:
       postgres:
         condition: service_healthy
