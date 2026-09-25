@@ -7,10 +7,15 @@ import { qrCodeFormSchema, type QrCodeFormInput } from '@/schemas/qrcode'
 import { generateUrlHash, normalizeLeadsTo } from '@/lib/qrcode'
 import { firstZodError, type FormState } from '@/lib/forms'
 import { getSessionUserId } from '@/lib/auth-guard'
+import { invalidateRedirect } from '@/lib/redirect-cache'
 
 const MAX_HASH_ATTEMPTS = 5
 
 const NOT_SIGNED_IN = 'You must be signed in.'
+
+function isRecordNotFound(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
+}
 
 function parseQrCodeForm(formData: FormData): { data: QrCodeFormInput } | { error: string } {
   const parsed = qrCodeFormSchema.safeParse({
@@ -71,13 +76,16 @@ export async function updateQrCodeAction(_prevState: FormState, formData: FormDa
   const { leadsTo, note, shape, fgColor, bgColor } = result.data
 
   // urlHash is intentionally left untouched — the QR image itself never changes.
-  const { count } = await prisma.qrCode.updateMany({
-    where: { id, userId },
-    data: { leadsTo, note, shape, fgColor, bgColor },
-  })
-
-  if (count === 0) {
-    return { error: 'QR code not found.' }
+  try {
+    const { urlHash } = await prisma.qrCode.update({
+      where: { id, userId },
+      data: { leadsTo, note, shape, fgColor, bgColor },
+      select: { urlHash: true },
+    })
+    invalidateRedirect(urlHash)
+  } catch (error) {
+    if (isRecordNotFound(error)) return { error: 'QR code not found.' }
+    throw error
   }
 
   revalidatePath('/')
@@ -90,7 +98,12 @@ export async function deleteQrCodeAction(id: string): Promise<void> {
     throw new Error('Unauthorized')
   }
 
-  await prisma.qrCode.deleteMany({ where: { id, userId } })
+  try {
+    const { urlHash } = await prisma.qrCode.delete({ where: { id, userId }, select: { urlHash: true } })
+    invalidateRedirect(urlHash)
+  } catch (error) {
+    if (!isRecordNotFound(error)) throw error
+  }
 
   revalidatePath('/')
 }
