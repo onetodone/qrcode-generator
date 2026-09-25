@@ -4,8 +4,11 @@ import { logger } from '@/lib/logger'
 
 const SLOW_QUERY_THRESHOLD_MS = 200
 
+export const DB_POOL_MIN = 2
+
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
+  min: DB_POOL_MIN,
 })
 
 function createPrismaClient() {

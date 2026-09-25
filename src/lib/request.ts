@@ -12,6 +12,19 @@ export function clientIpFromHeaders(headerList: Headers): string {
   return headerList.get('x-real-ip')?.trim() || 'unknown'
 }
 
+/**
+ * True for speculative loads the user never asked for: Chrome's omnibox /
+ * speculation-rules prefetch and prerender (`Sec-Purpose: prefetch[;prerender]`),
+ * plus the legacy `Purpose` / `X-Purpose` / `X-Moz` prefetch headers. Chrome
+ * discards a prerender that redirects cross-origin, so the real navigation hits
+ * the server again — counting both would double every view.
+ */
+export function isPrefetchRequest(headerList: Headers): boolean {
+  if (headerList.get('sec-purpose')?.includes('prefetch')) return true
+  const legacy = headerList.get('purpose') ?? headerList.get('x-purpose') ?? headerList.get('x-moz')
+  return legacy === 'prefetch' || legacy === 'preview'
+}
+
 export async function getClientIp(): Promise<string> {
   return clientIpFromHeaders(await headers())
 }
