@@ -96,12 +96,13 @@ export async function updateQrCodeAction(_prevState: FormState, formData: FormDa
   return { success: true }
 }
 
-/** Deletes one of the signed-in user's QR codes. Unknown or foreign ids are ignored. */
-export async function deleteQrCodeAction(id: string): Promise<void> {
+/** Deletes one of the signed-in user's QR codes. Invalid, unknown or foreign ids are ignored. */
+export async function deleteQrCodeAction(id: unknown): Promise<void> {
   const userId = await getSessionUserId()
   if (!userId) {
     throw new Error('Unauthorized')
   }
+  if (typeof id !== 'string' || !id) return
 
   try {
     const { urlHash } = await prisma.qrCode.delete({ where: { id, userId }, select: { urlHash: true } })
