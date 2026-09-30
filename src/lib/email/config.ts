@@ -22,7 +22,7 @@ function readBoolean(name: string): boolean | undefined {
   if (value === 'true' || value === '1') return true
   if (value === 'false' || value === '0') return false
 
-  throw new Error(`[email] ${name} must be "true", "false" or empty`)
+  throw new Error(`[email] ${name} must be "true", "false", "1", "0" or empty`)
 }
 
 /**
