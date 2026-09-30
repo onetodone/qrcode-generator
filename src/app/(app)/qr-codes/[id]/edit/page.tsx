@@ -6,6 +6,7 @@ import { requireUserId } from '@/lib/auth-guard'
 import { updateQrCodeAction } from '@/actions/qrcode'
 import { PageContainer, PageHeader } from '@/components/page-header'
 import { QrCodeForm } from '@/components/qrcode/qr-code-form'
+import { QrDisabledAlert } from '@/components/qrcode/qr-disabled-notice'
 
 export const metadata: Metadata = {
   title: 'Edit QR Code',
@@ -28,6 +29,7 @@ export default async function EditQrCodePage({ params }: { params: Promise<{ id:
         title="Edit QR Code"
         description="Update the endpoint, note, and design. The tracking link stays the same, so printed codes keep working."
       />
+      {qrCode.disabledReason && <QrDisabledAlert reason={qrCode.disabledReason} />}
       <QrCodeForm
         action={updateQrCodeAction}
         hiddenId={qrCode.id}

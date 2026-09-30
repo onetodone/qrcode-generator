@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { PencilIcon, Trash2Icon } from 'lucide-react'
 import type { QrShapeValue } from '@/schemas/qrcode'
+import type { QrDisabledReason } from '@/generated/enums'
 import { randomToken } from '@/lib/random'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { QrImage } from '@/components/qrcode/qr-image'
+import { QrDisabledBadge } from '@/components/qrcode/qr-disabled-notice'
 import { deleteQrCodeAction } from '@/actions/qrcode'
 
 // High enough resolution for print materials (posters, booklets).
@@ -34,6 +36,7 @@ export type QrCodeCardData = {
   fgColor: string
   bgColor: string
   views: number
+  disabledReason: QrDisabledReason | null
   redirectUrl: string
 }
 
@@ -103,21 +106,30 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
           className="shrink-0 rounded-md ring-1 ring-foreground/10"
         />
         <div className="min-w-0 h-full flex flex-col flex-1">
-          <a
-            href={qrCode.leadsTo}
-            target="_blank"
-            rel="noreferrer"
-            title={qrCode.leadsTo}
-            className="block truncate font-medium text-primary underline underline-offset-4"
-          >
-            {qrCode.leadsTo}
-          </a>
+          {qrCode.disabledReason ? (
+            <p title={qrCode.leadsTo} className="truncate font-medium text-muted-foreground line-through">
+              {qrCode.leadsTo}
+            </p>
+          ) : (
+            <a
+              href={qrCode.leadsTo}
+              target="_blank"
+              rel="noreferrer"
+              title={qrCode.leadsTo}
+              className="block truncate font-medium text-primary underline underline-offset-4"
+            >
+              {qrCode.leadsTo}
+            </a>
+          )}
           <p title={qrCode.note || undefined} className="mt-0.5 mb-2 line-clamp-2 text-muted-foreground">
             {qrCode.note || '-'}
           </p>
-          <p className="mt-auto text-sm text-muted-foreground">
-            <strong>{qrCode.views}</strong> {qrCode.views === 1 ? 'scan' : 'scans'}
-          </p>
+          <div className="mt-auto flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <p>
+              <strong>{qrCode.views}</strong> {qrCode.views === 1 ? 'scan' : 'scans'}
+            </p>
+            {qrCode.disabledReason && <QrDisabledBadge reason={qrCode.disabledReason} />}
+          </div>
         </div>
       </div>
       <Separator className="my-1" />

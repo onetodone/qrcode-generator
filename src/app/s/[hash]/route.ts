@@ -6,8 +6,10 @@ import { logger, logRequest } from '@/lib/logger'
 import { clientIpFromHeaders, isPrefetchRequest } from '@/lib/request'
 import { rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
 import { getCachedRedirect, redirectCacheGeneration, setCachedRedirect } from '@/lib/redirect-cache'
+import { isRecheckDue, recheckDestination } from '@/lib/destination-safety'
 
 const REDIRECT_RATE_LIMIT = { limit: 60, windowMs: 60_000 }
+const DISABLED_LINK_PATH = '/link-disabled'
 
 export async function GET(request: Request, { params }: { params: Promise<{ hash: string }> }) {
   const start = performance.now()
@@ -34,12 +36,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ hash
     })
   }
 
-  let leadsTo = getCachedRedirect(hash)
-  if (leadsTo === undefined) {
+  let target = getCachedRedirect(hash)
+  if (target === undefined) {
     const generation = redirectCacheGeneration()
     const qrCode = await prisma.qrCode.findUnique({
       where: { urlHash: hash },
-      select: { leadsTo: true },
+      select: { urlHash: true, leadsTo: true, disabledAt: true, destinationSetAt: true, destinationCheckedAt: true },
     })
 
     if (!qrCode) {
@@ -47,11 +49,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ hash
       notFound()
     }
 
-    leadsTo = qrCode.leadsTo
-    setCachedRedirect(hash, leadsTo, generation)
+    target = { leadsTo: qrCode.leadsTo, disabled: qrCode.disabledAt !== null }
+    setCachedRedirect(hash, target, generation)
+
+    if (isRecheckDue(qrCode)) {
+      after(() => recheckDestination(qrCode))
+    }
   }
 
   status = 307
+
+  if (target.disabled) {
+    return new NextResponse(null, { status, headers: { Location: DISABLED_LINK_PATH } })
+  }
 
   const isRealScan =
     request.method === 'GET' && !isPrefetchRequest(request.headers) && !isbot(request.headers.get('user-agent') ?? '')
@@ -68,5 +78,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ hash
     })
   }
 
-  return NextResponse.redirect(leadsTo)
+  return NextResponse.redirect(target.leadsTo)
 }
