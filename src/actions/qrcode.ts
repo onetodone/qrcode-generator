@@ -37,6 +37,7 @@ function parseQrCodeForm(formData: FormData): { data: QrCodeFormInput } | { erro
   return { data: { ...parsed.data, leadsTo } }
 }
 
+/** Creates a QR code for the signed-in user with a unique redirect hash. */
 export async function createQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
@@ -62,6 +63,10 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
   return { success: true }
 }
 
+/**
+ * Updates a QR code's endpoint, note and design. The redirect hash never
+ * changes, so printed codes keep resolving.
+ */
 export async function updateQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
@@ -75,7 +80,6 @@ export async function updateQrCodeAction(_prevState: FormState, formData: FormDa
   if ('error' in result) return { error: result.error }
   const { leadsTo, note, shape, fgColor, bgColor } = result.data
 
-  // urlHash is intentionally left untouched — the QR image itself never changes.
   try {
     const { urlHash } = await prisma.qrCode.update({
       where: { id, userId },
@@ -92,6 +96,7 @@ export async function updateQrCodeAction(_prevState: FormState, formData: FormDa
   return { success: true }
 }
 
+/** Deletes one of the signed-in user's QR codes. Unknown or foreign ids are ignored. */
 export async function deleteQrCodeAction(id: string): Promise<void> {
   const userId = await getSessionUserId()
   if (!userId) {

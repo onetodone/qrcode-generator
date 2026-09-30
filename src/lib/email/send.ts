@@ -5,8 +5,10 @@ import { minifyHtml } from './minify'
 import { renderEmailTemplate } from './template'
 import { getTransporter } from './transporter'
 
+/** Nodemailer attachment. */
 export type EmailAttachment = Mail.Attachment
 
+/** Options for `sendEmail`. `content` is raw HTML placed in the template body. */
 export interface SendEmailParams {
   to: string[]
   subject?: string
@@ -18,6 +20,7 @@ export interface SendEmailParams {
   footerText?: string
 }
 
+/** Renders `content` into the shared email template and sends it. Failures are logged and rethrown. */
 export async function sendEmail({
   to,
   subject = 'Subject',

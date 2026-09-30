@@ -1,9 +1,3 @@
-// Structured request/app logger. Emits one JSON object per line to stdout
-// (stderr for errors), which is what a container log collector expects. Every
-// value is run through `maskSecrets` first, so passwords, tokens, JWTs, and
-// Authorization / cookie headers can't reach the log even if a caller passes a
-// whole request object or error by accident.
-
 type LogLevel = 'info' | 'warn' | 'error'
 
 const SENSITIVE_KEY_PATTERN = /pass|secret|token|authorization|cookie|credential|otp/i
@@ -22,6 +16,11 @@ function maskString(value: string): string {
     .replace(SECRET_PARAM_PATTERN, `$1${REDACTED}`)
 }
 
+/**
+ * Copy of `value` with passwords, tokens, JWTs, bearer credentials and secret
+ * query parameters replaced by `[redacted]`. Errors become
+ * `{ name, message, stack }`; cycles and deep nesting are cut off.
+ */
 export function maskSecrets(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (typeof value === 'string') return maskString(value)
   if (value === null || typeof value !== 'object') return value
@@ -66,12 +65,18 @@ function emit(level: LogLevel, event: string, fields?: Record<string, unknown>):
   else rawConsole.log(line)
 }
 
+/**
+ * Structured logger: one JSON line per event, stderr for errors. Fields pass
+ * through `maskSecrets`, so secrets can't reach the log even when a whole
+ * request or error object is logged.
+ */
 export const logger = {
   info: (event: string, fields?: Record<string, unknown>) => emit('info', event, fields),
   warn: (event: string, fields?: Record<string, unknown>) => emit('warn', event, fields),
   error: (event: string, fields?: Record<string, unknown>) => emit('error', event, fields),
 }
 
+/** Fields of one access-log line. */
 export type RequestLogFields = {
   method: string
   path: string
@@ -81,6 +86,7 @@ export type RequestLogFields = {
   durationMs: number
 }
 
+/** Writes the access-log line for a finished request. */
 export function logRequest({ method, path, ip, userId, status, durationMs }: RequestLogFields): void {
   logger.info('request', {
     method,

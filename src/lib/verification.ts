@@ -44,6 +44,11 @@ const COPY: Record<
   },
 }
 
+/**
+ * Issues a single-use token of `type` for `email`, replacing any earlier one,
+ * and emails the link. Returns false without sending when the previous token
+ * is less than 2 minutes old.
+ */
 export async function sendVerificationEmail(
   email: string,
   type: VerificationTokenType = VerificationTokenType.EMAIL_VERIFY,

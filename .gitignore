@@ -42,13 +42,5 @@ next-env.d.ts
 # prisma client
 /prisma/generated
 
-# AI Helpers
-/.agents/
-/.claude/
-/AGENTS.md
-/CLAUDE.md
-/PROGRESS.md
-/skills-lock.json
-
 # IDE
 /.vscode/

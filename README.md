@@ -124,11 +124,6 @@ src/components/        React components (ui/ = shadcn primitives, qrcode/ = doma
 src/lib/                Shared utilities (Prisma client, auth guard, endpoint parsing, logger)
 ```
 
-## Contributing
-
-Branching, CI, and release process are documented in
-[`CONTRIBUTING.md`](./CONTRIBUTING.md).
-
 ## License
 
 [MIT](./LICENSE) © [Anton Holubeu](https://github.com/aholu)

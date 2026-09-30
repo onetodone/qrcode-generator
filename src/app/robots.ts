@@ -9,9 +9,7 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
-      // `Disallow: /` blocks everything; the `allow` entries below are more
-      // specific paths and take precedence over it, so nothing else needs to
-      // be named explicitly here.
+      // The more specific `allow` paths take precedence over `Disallow: /`.
       allow: ['/login', '/register', '/forgot-password'],
       disallow: '/',
     },

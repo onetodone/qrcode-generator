@@ -1,5 +1,10 @@
 import { headers } from 'next/headers'
 
+/**
+ * Client IP from the rightmost `X-Forwarded-For` entry, the one appended by
+ * the trusted proxy (entries to its left are client-controlled), falling back
+ * to `X-Real-IP` and then `'unknown'`.
+ */
 export function clientIpFromHeaders(headerList: Headers): string {
   const hops = headerList
     .get('x-forwarded-for')
@@ -25,6 +30,7 @@ export function isPrefetchRequest(headerList: Headers): boolean {
   return legacy === 'prefetch' || legacy === 'preview'
 }
 
+/** `clientIpFromHeaders` for the current request. */
 export async function getClientIp(): Promise<string> {
   return clientIpFromHeaders(await headers())
 }
@@ -39,6 +45,7 @@ export function baseUrlFromHeaders(headerList: Headers): string {
   return `${proto}://${headerList.get('host')}`
 }
 
+/** `baseUrlFromHeaders` for the current request. */
 export async function getBaseUrl(): Promise<string> {
   return baseUrlFromHeaders(await headers())
 }

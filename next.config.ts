@@ -10,9 +10,11 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' },
 ]
 
+// Vercel traces the build itself, and `output: 'standalone'` breaks its build step.
 const standaloneConfig: NextConfig = selfHosted
   ? {
       output: 'standalone',
+      // Turbopack's trace misses @swc/helpers under pnpm's symlinked store.
       outputFileTracingIncludes: {
         '/**/*': ['./node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/**/*'],
       },

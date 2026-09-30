@@ -22,6 +22,7 @@ const emailSchema = z.email()
 // otherwise flow straight into the redirect at src/app/s/[hash]/route.ts.
 const ALLOWED_URI_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 
+/** Whether `value` is a URI with a scheme the redirect is allowed to target. */
 export function isValidUri(value: string): boolean {
   try {
     return ALLOWED_URI_SCHEMES.has(new URL(value).protocol)
@@ -48,11 +49,10 @@ function isLikelyDomain(value: string): boolean {
 }
 
 /**
- * Ported from the legacy app's endpoint parsing: accept a ready-made URI
- * (https:, mailto:, tel:, ...) as-is, otherwise detect a phone number, an
- * email address, or fall back to treating the input as a bare https domain
- * (only when it actually looks like one — has a real zone/TLD). Returns null
- * when none of those interpretations apply.
+ * Turns user input into a redirect target: a ready-made URI (https:, mailto:,
+ * tel:, ...) as-is, otherwise a phone number, an email address, or a bare
+ * domain with a real zone/TLD prefixed with `https://`. Returns null when none
+ * of those apply.
  */
 export function normalizeLeadsTo(raw: string): string | null {
   const value = raw.trim()
@@ -73,6 +73,7 @@ export function normalizeLeadsTo(raw: string): string | null {
   return null
 }
 
+/** Random hash for the `/s/<hash>` redirect link. */
 export function generateUrlHash(): string {
   return randomToken(HASH_LENGTH)
 }

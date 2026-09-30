@@ -1,8 +1,7 @@
-// Fixed-window rate limiter, process-local. The app runs as a single container
-// (see docker-compose.yml), so an in-memory store is enough — state is lost on
-// restart, which only widens an active abuse window by the few seconds a
-// redeploy takes. If the app is ever scaled horizontally, swap the Map here for
-// a shared store (Redis); the call sites don't change.
+// Fixed-window, in-memory limiter. Each server instance counts on its own and
+// loses its state on restart, so with several instances (e.g. serverless) the
+// effective limit is per instance. A shared store such as Redis would make it
+// global without changing the call sites.
 
 type Bucket = { count: number; resetAt: number }
 
@@ -24,12 +23,14 @@ function sweepExpired(now: number): void {
   }
 }
 
+/** Outcome of one attempt: whether it is allowed, attempts left, and time until the window resets. */
 export type RateLimitResult = {
   ok: boolean
   remaining: number
   retryAfterMs: number
 }
 
+/** Records an attempt for `key` and reports whether it fits within `limit` per `windowMs`. */
 export function rateLimit(key: string, { limit, windowMs }: { limit: number; windowMs: number }): RateLimitResult {
   const now = Date.now()
   sweepExpired(now)
@@ -48,6 +49,7 @@ export function rateLimit(key: string, { limit, windowMs }: { limit: number; win
   }
 }
 
+/** User-facing "try again later" message, rounded up to whole minutes. */
 export function tooManyAttemptsMessage(retryAfterMs: number): string {
   const minutes = Math.max(1, Math.ceil(retryAfterMs / 60_000))
   return `Too many attempts. Please try again in about ${minutes} minute${minutes === 1 ? '' : 's'}.`
