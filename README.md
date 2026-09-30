@@ -21,6 +21,10 @@ deployed.
   password authentication with email confirmation and password reset.
 - **Editable metadata** — update a code's destination, note, or design after
   creation without regenerating the QR image itself.
+- **Unsafe destination protection** — destinations are checked against
+  Google Safe Browsing when saved and re-checked after scans; flagged codes
+  stop redirecting and show a warning page. Each account can create up to 10
+  codes per 24 hours.
 
 ## Tech stack
 
@@ -64,6 +68,7 @@ deployed.
    | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`               | Outgoing mail server (email confirmation, password reset).            |
    | `SMTP_SECURE` / `SMTP_REQUIRE_TLS`                                  | Encryption, `true`/`1`, `false`/`0` or empty. `SMTP_SECURE=true` connects over TLS from the start (default on port 465); `SMTP_REQUIRE_TLS=true` requires a STARTTLS upgrade. Use port 465, or 587 with `SMTP_REQUIRE_TLS=true`. |
    | `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME`                                | "From" identity on outgoing email (defaults to `SMTP_USER`).          |
+   | `SAFE_BROWSING_API_KEY`                                             | Google Safe Browsing API key (optional). Empty turns destination checks off. See [Unsafe destinations](#unsafe-destinations). |
 
 3. Apply database migrations:
 
@@ -107,6 +112,40 @@ the container (`localhost` inside the container is the container itself). Set
 `APP_URL` to the address users open the app at — links in outgoing email are
 built from it.
 
+## Unsafe destinations
+
+With `SAFE_BROWSING_API_KEY` set, every web destination is looked up in
+[Google Safe Browsing](https://developers.google.com/safe-browsing) (v5
+`urls:search`):
+
+- **On save** — a flagged destination is rejected. If the lookup fails, the
+  code is saved and checked on its next scan.
+- **After scans** — a scan re-checks the destination in the background once
+  it is due: hourly during the first week after the destination was set, daily
+  after that. A flagged code is disabled: its `/s/[hash]` link opens
+  `/link-disabled` instead of the destination and scans aren't counted. Saving
+  the code with a safe destination enables it again.
+
+To get a key, create a Google Cloud project, enable the **Safe Browsing API**,
+and create an API key restricted to that API. The Safe Browsing API is free for
+non-commercial use only; a commercial service needs
+[Web Risk](https://cloud.google.com/web-risk) instead. Destination URLs are
+sent to Google as part of the lookup.
+
+Codes reported by other means (for example an abuse email) can be disabled by
+hand. A manual disable survives edits by the owner:
+
+```bash
+pnpm qr:disable https://example.com/s/<hash>          # one code (link or bare hash)
+pnpm qr:disable <hash> --owner                        # every code of the same owner
+pnpm qr:enable <hash>                                 # lift a manual disable
+```
+
+The scripts use `DATABASE_URL` from the environment, falling back to `.env`.
+With Docker Compose, run them in the `migrate` service:
+`docker compose run --rm migrate pnpm qr:disable <hash>`. Running app instances
+may keep serving a cached redirect for up to 60 seconds.
+
 ## Scripts
 
 | Command             | Description                                        |
@@ -118,11 +157,14 @@ built from it.
 | `pnpm lint:ci`       | Run ESLint without autofix (as CI does).          |
 | `pnpm typecheck`     | Type-check without emitting output.               |
 | `pnpm format`        | Format the codebase with Prettier.                |
+| `pnpm qr:disable`    | Disable a QR code by hand (see [Unsafe destinations](#unsafe-destinations)). |
+| `pnpm qr:enable`     | Lift a manual disable.                            |
 
 ## Project structure
 
 ```
 prisma/               Schema, migrations, seed script, generated Prisma client
+scripts/              Operator scripts (disabling QR codes)
 src/app/               Routes (App Router)
 src/actions/           Server Actions
 src/schemas/           Zod validation schemas
