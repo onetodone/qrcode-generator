@@ -4,5 +4,28 @@ allowBuilds:
   prisma: true
   sharp: false
   unrs-resolver: false
+overrides:
+  fast-uri: ^3.1.8
+  mysql2: ^3.23.1
 minimumReleaseAgeExclude:
   - zod@4.6.5
+  - '@next/env@16.3.8'
+  - '@next/eslint-plugin-next@16.3.8'
+  - '@next/swc-darwin-arm64@16.3.8'
+  - '@next/swc-darwin-x64@16.3.8'
+  - '@next/swc-linux-arm64-gnu@16.3.8'
+  - '@next/swc-linux-arm64-musl@16.3.8'
+  - '@next/swc-linux-x64-gnu@16.3.8'
+  - '@next/swc-linux-x64-musl@16.3.8'
+  - '@next/swc-win32-arm64-msvc@16.3.8'
+  - '@next/swc-win32-x64-msvc@16.3.8'
+  - '@next/third-parties@16.3.8'
+  - dotenv@18.0.5
+  - eslint-config-next@16.3.8
+  - lucide-react@1.49.0
+  - next@16.3.8
+  - nodemailer@10.0.13
+  - pg-cloudflare@1.4.1
+  - pg-connection-string@2.14.1
+  - pg-protocol@1.16.1
+  - pg@8.23.1
