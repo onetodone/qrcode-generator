@@ -38,6 +38,14 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-qrcode_generator}?schema=public
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required — see .env.example}
       PORT: ${PORT:-3000}
+      APP_URL: ${APP_URL:-http://localhost:${PORT:-3000}}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required — sign-in needs a confirmed email, see .env.example}
+      SMTP_PORT: ${SMTP_PORT:?SMTP_PORT is required — sign-in needs a confirmed email, see .env.example}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
       GATAG_ID: ${GATAG_ID:-}
       CSP_CONNECT_SRC_EXTRA: ${CSP_CONNECT_SRC_EXTRA:-}
     depends_on:

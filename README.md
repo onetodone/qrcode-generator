@@ -92,13 +92,19 @@ automatically:
 
 ```bash
 cp .env.example .env
-# fill in AUTH_SECRET in .env (DATABASE_URL there is ignored — Compose points
-# the app at its own bundled Postgres instead)
+# fill in AUTH_SECRET and the SMTP_* settings in .env (DATABASE_URL there is
+# ignored — Compose points the app at its own bundled Postgres instead)
 docker compose up --build
 ```
 
 The app is then available at `http://localhost:3000` (override with `PORT`
 in `.env`). Data persists in a named Docker volume across restarts.
+
+Sign-in requires a confirmed email address, so Compose refuses to start without
+`SMTP_HOST` and `SMTP_PORT`. They must point at a mail server reachable from
+the container (`localhost` inside the container is the container itself). Set
+`APP_URL` to the address users open the app at — links in outgoing email are
+built from it.
 
 ## Scripts
 
