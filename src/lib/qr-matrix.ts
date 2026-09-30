@@ -1,14 +1,17 @@
 import qrcode from 'qrcode-generator'
 
-// Error correction level used for every code we render. Deliberately higher than
-// the strict minimum: decorative module shapes (rounded / dots) lose a little
-// edge contrast, so the extra redundancy of level "Q" keeps them scannable.
-// Kept constant across shapes so the module matrix — and its visual density —
-// is identical between the form preview and the saved code.
+/**
+ * Error correction level for every rendered code. Higher than the minimum:
+ * decorative module shapes lose some edge contrast, and the extra redundancy
+ * of level "Q" keeps them scannable. Constant across shapes, so the form
+ * preview has the same module density as the saved code.
+ */
 export const QR_LEVEL = 'Q' as const
 
-// Modules of margin (quiet zone) rendered around the matrix. The spec calls for
-// 4; some scanners are unforgiving with less, especially for styled codes.
+/**
+ * Quiet zone around the matrix, in modules. The spec calls for 4; some
+ * scanners fail with less, especially on styled codes.
+ */
 export const QR_MARGIN_MODULES = 4
 
 /**

@@ -16,10 +16,8 @@ export function ChangePasswordForm() {
   const [fields, setFields] = useState(emptyFields)
   const [state, action, pending] = useActionState<FormState, FormData>(changePasswordAction, undefined)
 
-  // Don't leave old/new passwords sitting in the form after a successful
-  // change. Done during render (comparing against the previous state)
-  // rather than in an Effect, since setState calls that just react to a
-  // changed value belong in the render phase, not an Effect body.
+  // Clear the password fields after a successful change. Done during render,
+  // not in an Effect, because it only reacts to a changed value.
   const [prevState, setPrevState] = useState(state)
   if (state !== prevState) {
     setPrevState(state)

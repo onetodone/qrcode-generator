@@ -15,6 +15,10 @@ import { hashPassword } from '@/lib/password'
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 const ONE_HOUR_MS = 60 * 60 * 1000
 
+/**
+ * Signs in with email and password. An unconfirmed account gets a fresh
+ * confirmation link and is redirected to `/verify-email`. Rate-limited per IP.
+ */
 export async function loginAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const login = rateLimit(`login:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
   if (!login.ok) {
@@ -47,10 +51,15 @@ export async function loginAction(_prevState: FormState, formData: FormData): Pr
   }
 }
 
+/** Signs out and redirects to `/login`. */
 export async function logoutAction(): Promise<void> {
   await signOut({ redirectTo: '/login' })
 }
 
+/**
+ * Creates an account and emails the confirmation link. Sign-in stays blocked
+ * until the address is confirmed. Rate-limited per IP.
+ */
 export async function registerAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const register = rateLimit(`register:${await getClientIp()}`, { limit: 5, windowMs: ONE_HOUR_MS })
   if (!register.ok) {
@@ -87,6 +96,11 @@ export async function registerAction(_prevState: FormState, formData: FormData):
   redirect(`/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
 }
 
+/**
+ * Resends the confirmation link for an unconfirmed account or a pending email
+ * change. Unknown addresses get the same success response, so the form can't
+ * be used to probe for accounts. Rate-limited per IP.
+ */
 export async function resendVerificationEmailAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const resend = rateLimit(`resend-verification:${await getClientIp()}`, { limit: 5, windowMs: FIFTEEN_MINUTES_MS })
   if (!resend.ok) {
@@ -116,6 +130,7 @@ export async function resendVerificationEmailAction(_prevState: FormState, formD
   return { success: true }
 }
 
+/** Emails a password reset link when the account exists. Rate-limited per IP. */
 export async function forgotPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const forgot = rateLimit(`forgot-password:${await getClientIp()}`, { limit: 5, windowMs: FIFTEEN_MINUTES_MS })
   if (!forgot.ok) {
@@ -138,6 +153,10 @@ export async function forgotPasswordAction(_prevState: FormState, formData: Form
   return { success: true }
 }
 
+/**
+ * Sets a new password from a reset token and revokes every existing session
+ * of the account. Does not sign in. Rate-limited per IP.
+ */
 export async function resetPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const reset = rateLimit(`reset-password:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
   if (!reset.ok) {

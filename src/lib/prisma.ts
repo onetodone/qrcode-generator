@@ -4,6 +4,10 @@ import { logger } from '@/lib/logger'
 
 const SLOW_QUERY_THRESHOLD_MS = 200
 
+/**
+ * Idle connections the pool keeps open. Zero on Vercel, where frozen instances
+ * would hold stale connections against the database's connection limit.
+ */
 export const DB_POOL_MIN = process.env.VERCEL ? 0 : 2
 
 const adapter = new PrismaPg({
@@ -35,6 +39,7 @@ const globalForPrisma = globalThis as unknown as {
   prisma: ReturnType<typeof createPrismaClient> | undefined
 }
 
+/** Shared Prisma client. Queries slower than 200 ms are logged as `prisma.slow_query`. */
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') {

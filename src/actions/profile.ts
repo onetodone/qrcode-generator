@@ -12,6 +12,10 @@ import { getSessionUserId } from '@/lib/auth-guard'
 
 const NOT_SIGNED_IN = 'You must be signed in.'
 
+/**
+ * Updates the signed-in user's name. A different email is stored as pending
+ * and replaces the current one only after its confirmation link is followed.
+ */
 export async function updateProfileAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
@@ -73,6 +77,10 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
   return { success: true }
 }
 
+/**
+ * Changes the signed-in user's password after checking the current one. Other
+ * sessions are revoked; the current one stays signed in.
+ */
 export async function changePasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }

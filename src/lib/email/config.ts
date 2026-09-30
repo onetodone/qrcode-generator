@@ -1,3 +1,4 @@
+/** Nodemailer transport options plus the "From" header. */
 export interface SmtpConfig {
   host: string
   port: number
@@ -14,6 +15,7 @@ function buildFrom(): string {
   return name ? `"${name}" <${email}>` : email
 }
 
+/** SMTP settings from the `SMTP_*` environment variables. Throws when host or port is missing. */
 export function getSmtpConfig(): SmtpConfig {
   const host = process.env.SMTP_HOST
   const port = Number(process.env.SMTP_PORT)
