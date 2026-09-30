@@ -61,7 +61,8 @@ deployed.
    | `DATABASE_URL`                                                      | PostgreSQL connection string.                                         |
    | `APP_URL`                                                           | Public base URL — used for metadata and links in outgoing email.      |
    | `AUTH_SECRET`                                                       | Auth.js session secret. Generate with `openssl rand -base64 32`.      |
-   | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_SECURE` | Outgoing mail server (email confirmation, password reset). `SMTP_SECURE` is `ssl`, `tls`, or empty. |
+   | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`               | Outgoing mail server (email confirmation, password reset).            |
+   | `SMTP_SECURE` / `SMTP_REQUIRE_TLS`                                  | Encryption, `true`/`false`/empty. `SMTP_SECURE=true` connects over TLS from the start (default on port 465); `SMTP_REQUIRE_TLS=true` requires a STARTTLS upgrade. Use port 465, or 587 with `SMTP_REQUIRE_TLS=true`. |
    | `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME`                                | "From" identity on outgoing email (defaults to `SMTP_USER`).          |
 
 3. Apply database migrations:
