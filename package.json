@@ -26,6 +26,7 @@
     "build": "next build",
     "start": "dotenv -e .env -- next start",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx}\"",
     "lint": "eslint . --fix",
     "lint:ci": "eslint .",
     "typecheck": "next typegen && tsc --noEmit"
