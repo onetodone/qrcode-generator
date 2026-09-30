@@ -4,6 +4,8 @@ import { logRequest } from '@/lib/logger'
 import { clientIpFromHeaders } from '@/lib/request'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password']
+// Open to guests and signed-in users alike; matched exactly.
+const publicRoutes = ['/link-disabled']
 
 const isDev = process.env.NODE_ENV !== 'production'
 const cspConnectSrcExtra = process.env.CSP_CONNECT_SRC_EXTRA?.trim() ?? ''
@@ -29,6 +31,7 @@ export default auth((req) => {
   const { nextUrl } = req
   const isLoggedIn = Boolean(req.auth)
   const isPublicOnlyRoute = publicOnlyRoutes.some((route) => nextUrl.pathname.startsWith(route))
+  const isPublicRoute = publicRoutes.includes(nextUrl.pathname)
 
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
   const csp = buildCsp(nonce)
@@ -37,7 +40,7 @@ export default auth((req) => {
   requestHeaders.set('Content-Security-Policy', csp)
 
   let response: NextResponse
-  if (!isLoggedIn && !isPublicOnlyRoute) {
+  if (!isLoggedIn && !isPublicOnlyRoute && !isPublicRoute) {
     response = NextResponse.redirect(new URL('/login', nextUrl))
   } else if (isLoggedIn && isPublicOnlyRoute) {
     response = NextResponse.redirect(new URL('/', nextUrl))

@@ -6,7 +6,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return <div className="flex min-h-svh items-center justify-center p-4">{children}</div>
 }
 
-/** A titled auth card (used for the invalid-link / check-your-email states). */
+/** A titled status card (invalid link, check your email, disabled link); actions go in `children`. */
 export function AuthCard({
   title,
   description,
@@ -14,7 +14,7 @@ export function AuthCard({
 }: {
   title: string
   description: string
-  children: ReactNode
+  children?: ReactNode
 }) {
   return (
     <AuthLayout>
@@ -23,7 +23,7 @@ export function AuthCard({
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
-        <CardFooter className="flex-col gap-2">{children}</CardFooter>
+        {children && <CardFooter className="flex-col gap-2">{children}</CardFooter>}
       </Card>
     </AuthLayout>
   )

@@ -49,3 +49,16 @@ export function baseUrlFromHeaders(headerList: Headers): string {
 export async function getBaseUrl(): Promise<string> {
   return baseUrlFromHeaders(await headers())
 }
+
+/** Hostnames the app is reached at: the current request's host and `APP_URL`'s. */
+export async function getAppHostnames(): Promise<string[]> {
+  const hostnames = [new URL(await getBaseUrl()).hostname]
+  if (process.env.APP_URL) {
+    try {
+      hostnames.push(new URL(process.env.APP_URL).hostname)
+    } catch {
+      // An invalid APP_URL only means one hostname fewer.
+    }
+  }
+  return hostnames
+}

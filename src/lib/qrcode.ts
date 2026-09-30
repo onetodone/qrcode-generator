@@ -73,6 +73,29 @@ export function normalizeLeadsTo(raw: string): string | null {
   return null
 }
 
+/**
+ * Whether a destination carries a username or password. `https://bank.com@evil.example`
+ * opens `evil.example` while reading like `bank.com`.
+ */
+export function hasUrlCredentials(leadsTo: string): boolean {
+  try {
+    const url = new URL(leadsTo)
+    return url.username !== '' || url.password !== ''
+  } catch {
+    return false
+  }
+}
+
+/** Whether a destination is a `/s/<hash>` link on one of `appHostnames`, i.e. another code's tracking link. */
+export function isOwnRedirectLink(leadsTo: string, appHostnames: string[]): boolean {
+  try {
+    const url = new URL(leadsTo)
+    return appHostnames.includes(url.hostname) && url.pathname.startsWith('/s/')
+  } catch {
+    return false
+  }
+}
+
 /** Random hash for the `/s/<hash>` redirect link. */
 export function generateUrlHash(): string {
   return randomToken(HASH_LENGTH)
