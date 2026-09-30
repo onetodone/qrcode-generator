@@ -9,12 +9,14 @@ import { changePasswordSchema, updateProfileSchema } from '@/schemas/profile'
 import { firstZodError, type FormState } from '@/lib/forms'
 import { hashPassword, verifyPassword } from '@/lib/password'
 import { getSessionUserId } from '@/lib/auth-guard'
+import { logger } from '@/lib/logger'
 
 const NOT_SIGNED_IN = 'You must be signed in.'
 
 /**
  * Updates the signed-in user's name. A different email is stored as pending
  * and replaces the current one only after its confirmation link is followed.
+ * Nothing is saved when that link can't be emailed.
  */
 export async function updateProfileAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
@@ -45,6 +47,16 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
     if (existing) {
       return { error: 'An account with this email already exists.' }
     }
+
+    try {
+      await sendVerificationEmail(parsed.data.email, VerificationTokenType.EMAIL_CHANGE)
+    } catch (error) {
+      logger.error('profile.email_change_email_failed', { error })
+      return {
+        error:
+          "We couldn't send the confirmation email to the new address. Nothing was saved; please try again in a few minutes.",
+      }
+    }
   }
 
   await prisma.user.update({
@@ -57,10 +69,6 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
       ...(emailChanged ? { pendingEmail: parsed.data.email } : currentUser?.pendingEmail ? { pendingEmail: null } : {}),
     },
   })
-
-  if (emailChanged) {
-    await sendVerificationEmail(parsed.data.email, VerificationTokenType.EMAIL_CHANGE)
-  }
 
   if (currentUser?.pendingEmail && currentUser.pendingEmail !== parsed.data.email) {
     await prisma.verificationToken.deleteMany({

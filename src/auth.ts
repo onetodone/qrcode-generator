@@ -12,6 +12,10 @@ export class EmailNotVerifiedSignin extends CredentialsSignin {
   code = 'email_not_verified'
 }
 
+export class ConfirmationEmailFailedSignin extends CredentialsSignin {
+  code = 'confirmation_email_failed'
+}
+
 export class VerificationTokenExpiredSignin extends CredentialsSignin {
   code = 'verification_token_expired'
   constructor(public email: string) {
@@ -111,7 +115,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         if (!passwordsMatch) return null
 
         if (!user.emailVerified) {
-          await sendVerificationEmail(user.email)
+          try {
+            await sendVerificationEmail(user.email)
+          } catch (error) {
+            logger.error('auth.confirmation_email_failed', { error })
+            throw new ConfirmationEmailFailedSignin()
+          }
           throw new EmailNotVerifiedSignin()
         }
 
