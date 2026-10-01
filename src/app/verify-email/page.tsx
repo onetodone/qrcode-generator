@@ -3,18 +3,16 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { AuthCard } from '@/components/auth-card'
+import { readHandoffCookie } from '@/lib/handoff-cookies'
 import { ResendVerificationForm } from './resend-verification-form'
 
 export const metadata: Metadata = {
   title: 'Verify email',
 }
 
-export default async function VerifyEmailPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; email?: string }>
-}) {
-  const { status, email } = await searchParams
+export default async function VerifyEmailPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  const { status } = await searchParams
+  const email = await readHandoffCookie('pendingEmail')
 
   if (status === 'expired' && email) {
     return (

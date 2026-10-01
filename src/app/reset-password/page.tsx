@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
+import { readHandoffCookie } from '@/lib/handoff-cookies'
 import { Button } from '@/components/ui/button'
 import { AuthCard, AuthLayout } from '@/components/auth-card'
 import { ResetPasswordForm } from './reset-password-form'
@@ -11,8 +12,8 @@ export const metadata: Metadata = {
   title: 'Reset password',
 }
 
-export default async function ResetPasswordPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
-  const { token } = await searchParams
+export default async function ResetPasswordPage() {
+  const token = await readHandoffCookie('resetToken')
   if (!token) {
     redirect('/forgot-password')
   }
