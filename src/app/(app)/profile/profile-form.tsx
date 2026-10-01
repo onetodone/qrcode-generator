@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { ResendVerificationForm } from '@/app/verify-email/resend-verification-form'
 
 export function ProfileForm({
@@ -26,15 +26,21 @@ export function ProfileForm({
 }) {
   const [name, setName] = useState(defaultName)
   const [email, setEmail] = useState(defaultEmail)
+  const [currentPassword, setCurrentPassword] = useState('')
   const router = useRouter()
   const [state, action, pending] = useActionState<FormState, FormData>(updateProfileAction, undefined)
 
   useActionResult(state, {
     onSuccess: () => {
       toast.success('Profile updated.')
+      setCurrentPassword('')
       router.refresh()
     },
   })
+
+  // Mirrors `updateProfileAction`: only a new address, not the current or the pending one, needs the password.
+  const trimmedEmail = email.trim()
+  const passwordRequired = trimmedEmail !== defaultEmail && trimmedEmail !== pendingEmail
 
   return (
     <Card>
@@ -77,6 +83,23 @@ export function ProfileForm({
                 />
               </FieldContent>
             </Field>
+            {passwordRequired && (
+              <Field>
+                <FieldLabel htmlFor="currentPassword">Current password</FieldLabel>
+                <FieldContent>
+                  <Input
+                    id="currentPassword"
+                    name="currentPassword"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                    autoComplete="current-password"
+                    required
+                  />
+                  <FieldDescription>Required to change your email.</FieldDescription>
+                </FieldContent>
+              </Field>
+            )}
             {state?.error && <FieldError>{state.error}</FieldError>}
             <Button type="submit" disabled={pending} className="self-end">
               {pending ? 'Saving...' : 'Save changes'}

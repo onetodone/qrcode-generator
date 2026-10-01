@@ -6,18 +6,47 @@ import { signIn, unstable_update } from '@/auth'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
+import { sendEmailChangeRequestedNotice } from '@/lib/account-emails'
+import { afterResponse } from '@/lib/after-response'
 import { changePasswordSchema, updateProfileSchema } from '@/schemas/profile'
 import { firstZodError, type FormState } from '@/lib/forms'
 import { hashPassword, verifyPassword } from '@/lib/password'
+import { rateLimit, refundRateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
+import { getClientIp } from '@/lib/request'
 import { getSessionUserId } from '@/lib/auth-guard'
 import { logger } from '@/lib/logger'
 
 const NOT_SIGNED_IN = 'You must be signed in.'
 
+const CURRENT_PASSWORD_LIMIT = { limit: 5, windowMs: 15 * 60 * 1000 }
+
 /**
- * Updates the signed-in user's name. A different email is stored as pending
- * and replaces the current one only after its confirmation link is followed.
- * Nothing is saved when that link can't be emailed.
+ * Checks the signed-in user's current password. Failed checks are limited per
+ * user, and the profile and change-password forms share the limit, so a
+ * session alone can't be used to guess the password. A correct password
+ * doesn't count. Returns the error to show, or `null` when it matches.
+ */
+async function checkCurrentPassword(userId: string, password: string, hash: string | null): Promise<string | null> {
+  const key = `current-password:${userId}`
+  const attempt = rateLimit(key, CURRENT_PASSWORD_LIMIT)
+  if (!attempt.ok) {
+    refundRateLimit(key)
+    return tooManyAttemptsMessage(attempt.retryAfterMs)
+  }
+
+  if (!hash || !(await verifyPassword(password, hash))) {
+    return 'Current password is incorrect.'
+  }
+
+  refundRateLimit(key)
+  return null
+}
+
+/**
+ * Updates the signed-in user's name. A new email address needs the current
+ * password; it is stored as pending and replaces the current one only after
+ * its confirmation link is followed, and the current address is told about
+ * the request. Nothing is saved when the link can't be emailed.
  */
 export async function updateProfileAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
@@ -26,6 +55,7 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
   const parsed = updateProfileSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),
+    currentPassword: formData.get('currentPassword') ?? undefined,
   })
 
   if (!parsed.success) {
@@ -34,11 +64,23 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
 
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true, pendingEmail: true },
+    select: { name: true, email: true, pendingEmail: true, password: true },
   })
-  const emailChanged = currentUser?.email !== parsed.data.email
+  if (!currentUser) return { error: NOT_SIGNED_IN }
 
-  if (emailChanged) {
+  const emailChanged = currentUser.email !== parsed.data.email
+  // Saving the pending address again keeps the request as it is.
+  const newEmailRequested = emailChanged && currentUser.pendingEmail !== parsed.data.email
+
+  let noticeDue = false
+  if (newEmailRequested) {
+    if (!parsed.data.currentPassword) {
+      return { error: 'Enter your current password to change your email.' }
+    }
+    // Checked before the lookup below, so probing addresses takes the password.
+    const passwordError = await checkCurrentPassword(userId, parsed.data.currentPassword, currentUser.password)
+    if (passwordError) return { error: passwordError }
+
     const existing = await prisma.user.findFirst({
       where: {
         id: { not: userId },
@@ -50,7 +92,7 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
     }
 
     try {
-      await sendVerificationEmail(parsed.data.email, VerificationTokenType.EMAIL_CHANGE)
+      noticeDue = await sendVerificationEmail(parsed.data.email, VerificationTokenType.EMAIL_CHANGE)
     } catch (error) {
       logger.error('profile.email_change_email_failed', { error })
       return {
@@ -67,14 +109,20 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
       // The real `email`/`emailVerified` stay untouched until the new
       // address is confirmed, so a typo here can't lock the user out.
       // Saving the current email again cancels a pending change.
-      ...(emailChanged ? { pendingEmail: parsed.data.email } : currentUser?.pendingEmail ? { pendingEmail: null } : {}),
+      ...(emailChanged ? { pendingEmail: parsed.data.email } : currentUser.pendingEmail ? { pendingEmail: null } : {}),
     },
   })
 
-  if (currentUser?.pendingEmail && currentUser.pendingEmail !== parsed.data.email) {
+  if (currentUser.pendingEmail && currentUser.pendingEmail !== parsed.data.email) {
     await prisma.verificationToken.deleteMany({
       where: { identifier: currentUser.pendingEmail, type: VerificationTokenType.EMAIL_CHANGE },
     })
+  }
+
+  if (noticeDue) {
+    const newEmail = parsed.data.email
+    const ip = await getClientIp()
+    afterResponse('profile.email_change_notice_failed', () => sendEmailChangeRequestedNotice(currentUser, newEmail, ip))
   }
 
   // The `jwt` callback reads the name from the database.
@@ -109,9 +157,9 @@ export async function changePasswordAction(_prevState: FormState, formData: Form
     return { error: 'User not found.' }
   }
 
-  const currentPasswordValid = await verifyPassword(parsed.data.currentPassword, user.password)
-  if (!currentPasswordValid) {
-    return { error: 'Current password is incorrect.' }
+  const passwordError = await checkCurrentPassword(userId, parsed.data.currentPassword, user.password)
+  if (passwordError) {
+    return { error: passwordError }
   }
 
   await prisma.user.update({

@@ -1,11 +1,14 @@
-import NextAuth, { CredentialsSignin } from 'next-auth'
+import NextAuth, { CredentialsSignin, type User } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import { Prisma, VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
+import { sendEmailChangedNotice } from '@/lib/account-emails'
+import { afterResponse } from '@/lib/after-response'
 import { loginSchema } from '@/schemas/auth'
-import { verifyPasswordConstantTime } from '@/lib/password'
+import { passwordField } from '@/schemas/password'
+import { hashPassword, verifyPasswordConstantTime } from '@/lib/password'
 import { clearRateLimit, rateLimit, refundRateLimit } from '@/lib/rate-limit'
 import { clientIpFromHeaders } from '@/lib/request'
 import { logger } from '@/lib/logger'
@@ -18,12 +21,6 @@ export class ConfirmationEmailFailedSignin extends CredentialsSignin {
   code = 'confirmation_email_failed'
 }
 
-export class VerificationTokenExpiredSignin extends CredentialsSignin {
-  code = 'verification_token_expired'
-  constructor(public email: string) {
-    super()
-  }
-}
 export class VerificationTokenInvalidSignin extends CredentialsSignin {
   code = 'verification_token_invalid'
 }
@@ -57,6 +54,67 @@ async function passwordChangedAtMs(userId: string): Promise<number | null> {
 
 const SESSION_REVALIDATE_MS = 30_000
 
+/** Deletes the token. False when it was already gone, so a token works once even under concurrent requests. */
+async function consumeToken(token: string): Promise<boolean> {
+  const { count } = await prisma.verificationToken.deleteMany({ where: { token } })
+  return count === 1
+}
+
+/**
+ * Signs in from an email confirmation token. Confirming a new account's address
+ * also sets its password; confirming an email change switches the address and
+ * notifies the previous one.
+ */
+async function confirmEmail(token: string, password: unknown, request: Request): Promise<User> {
+  const record = await prisma.verificationToken.findUnique({ where: { token } })
+  if (!record || record.expires < new Date()) throw new VerificationTokenInvalidSignin()
+
+  if (record.type === VerificationTokenType.EMAIL_VERIFY) {
+    // Whoever confirms the address chooses the password, so a password set by
+    // someone who registered the address first never signs in.
+    const parsed = passwordField.safeParse(password)
+    if (!parsed.success) throw new VerificationTokenInvalidSignin()
+    const passwordHash = await hashPassword(parsed.data)
+
+    if (!(await consumeToken(token))) throw new VerificationTokenInvalidSignin()
+    const user = await prisma.user.findUnique({ where: { email: record.identifier } })
+    if (!user || user.emailVerified) throw new VerificationTokenInvalidSignin()
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: new Date(), password: passwordHash },
+    })
+    return { id: user.id, email: user.email, name: user.name }
+  }
+
+  if (record.type === VerificationTokenType.EMAIL_CHANGE) {
+    if (!(await consumeToken(token))) throw new VerificationTokenInvalidSignin()
+    const pendingUser = await prisma.user.findFirst({ where: { pendingEmail: record.identifier } })
+    if (!pendingUser) throw new VerificationTokenInvalidSignin()
+
+    let user
+    try {
+      user = await prisma.user.update({
+        where: { id: pendingUser.id },
+        data: { email: record.identifier, emailVerified: new Date(), pendingEmail: null },
+      })
+    } catch (error) {
+      // Someone else claimed this email address while the confirmation was pending.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new VerificationTokenInvalidSignin()
+      }
+      throw error
+    }
+
+    const newEmail = user.email
+    const ip = clientIpFromHeaders(request.headers)
+    afterResponse('auth.email_changed_notice_failed', () => sendEmailChangedNotice(pendingUser, newEmail, ip))
+    return { id: user.id, email: user.email, name: user.name }
+  }
+
+  throw new VerificationTokenInvalidSignin()
+}
+
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   adapter: PrismaAdapter(prisma),
   // Credentials-based auth only supports JWT sessions, not database sessions.
@@ -78,49 +136,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       },
       authorize: async (credentials, request) => {
         if (typeof credentials?.verificationToken === 'string') {
-          const record = await prisma.verificationToken.findUnique({
-            where: { token: credentials.verificationToken },
-          })
-          if (!record) throw new VerificationTokenInvalidSignin()
-
-          if (
-            record.type !== VerificationTokenType.EMAIL_VERIFY &&
-            record.type !== VerificationTokenType.EMAIL_CHANGE
-          ) {
-            throw new VerificationTokenInvalidSignin()
-          }
-
-          if (record.expires < new Date()) {
-            await prisma.verificationToken.delete({ where: { token: credentials.verificationToken } })
-            throw new VerificationTokenExpiredSignin(record.identifier)
-          }
-
-          await prisma.verificationToken.delete({ where: { token: credentials.verificationToken } })
-
-          if (record.type === VerificationTokenType.EMAIL_CHANGE) {
-            const pendingUser = await prisma.user.findFirst({ where: { pendingEmail: record.identifier } })
-            if (!pendingUser) throw new VerificationTokenInvalidSignin()
-
-            try {
-              const user = await prisma.user.update({
-                where: { id: pendingUser.id },
-                data: { email: record.identifier, emailVerified: new Date(), pendingEmail: null },
-              })
-              return { id: user.id, email: user.email, name: user.name }
-            } catch (error) {
-              // Someone else claimed this email address while the confirmation was pending.
-              if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                throw new VerificationTokenInvalidSignin()
-              }
-              throw error
-            }
-          }
-
-          const user = await prisma.user.update({
-            where: { email: record.identifier },
-            data: { emailVerified: new Date() },
-          })
-          return { id: user.id, email: user.email, name: user.name }
+          return confirmEmail(credentials.verificationToken, credentials.password, request)
         }
 
         const parsed = loginSchema.safeParse(credentials)
