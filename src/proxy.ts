@@ -1,6 +1,7 @@
 import { after, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { logRequest } from '@/lib/logger'
+import { setHandoffCookie } from '@/lib/handoff-cookies'
 import { clientIpFromHeaders } from '@/lib/request'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password']
@@ -39,11 +40,16 @@ export default auth((req) => {
   requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('Content-Security-Policy', csp)
 
+  const resetToken = nextUrl.pathname === '/reset-password' ? nextUrl.searchParams.get('token') : null
+
   let response: NextResponse
   if (!isLoggedIn && !isPublicOnlyRoute && !isPublicRoute) {
     response = NextResponse.redirect(new URL('/login', nextUrl))
   } else if (isLoggedIn && isPublicOnlyRoute) {
     response = NextResponse.redirect(new URL('/qrcodes', nextUrl))
+  } else if (resetToken) {
+    response = NextResponse.redirect(new URL('/reset-password', nextUrl))
+    setHandoffCookie(response, 'resetToken', resetToken, req.headers)
   } else {
     response = NextResponse.next({ request: { headers: requestHeaders } })
   }

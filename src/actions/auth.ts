@@ -14,6 +14,7 @@ import {
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
+import { storeHandoffCookie } from '@/lib/handoff-cookies'
 import { emailSchema, loginSchema, registerSchema, resetPasswordSchema } from '@/schemas/auth'
 import { rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
 import { getClientIp } from '@/lib/request'
@@ -60,7 +61,8 @@ export async function loginAction(_prevState: FormState, formData: FormData): Pr
     })
   } catch (error) {
     if (error instanceof EmailNotVerifiedSignin) {
-      redirect(`/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+      await storeHandoffCookie('pendingEmail', parsed.data.email)
+      redirect('/verify-email')
     }
     if (error instanceof ConfirmationEmailFailedSignin) {
       return { error: CONFIRMATION_EMAIL_FAILED }
@@ -125,7 +127,8 @@ export async function registerAction(_prevState: FormState, formData: FormData):
     return { error: CONFIRMATION_EMAIL_FAILED }
   }
 
-  redirect(`/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+  await storeHandoffCookie('pendingEmail', parsed.data.email)
+  redirect('/verify-email')
 }
 
 /**
