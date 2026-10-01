@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    await signIn('credentials', { verificationToken: token, redirectTo: '/' })
+    await signIn('credentials', { verificationToken: token, redirectTo: '/qrcodes' })
   } catch (error) {
     if (error instanceof VerificationTokenExpiredSignin) {
       const url = new URL('/verify-email', request.url)

@@ -30,7 +30,7 @@ export default async function DashboardPage() {
       <PageHeader
         title="Your QR Codes"
         action={
-          <Button nativeButton={false} render={<Link href="/qr-codes/new" />}>
+          <Button nativeButton={false} render={<Link href="/qrcodes/new" />}>
             <PlusIcon />
             Add QR Code
           </Button>

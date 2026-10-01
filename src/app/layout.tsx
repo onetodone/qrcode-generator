@@ -29,14 +29,14 @@ export const metadata: Metadata = {
     default: 'QR Code OneToDone',
     template: '%s | QR Code OneToDone',
   },
-  description: 'Internal QR code generator and tracker.',
+  description: 'Create QR codes with short redirect links and see how many times each one is scanned.',
   robots: {
     index: true,
     follow: true,
   },
   openGraph: {
     title: 'QR Code OneToDone',
-    description: 'Internal QR code generator and tracker.',
+    description: 'Create QR codes with short redirect links and see how many times each one is scanned.',
     type: 'website',
   },
 }

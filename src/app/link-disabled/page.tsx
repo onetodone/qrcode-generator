@@ -13,7 +13,7 @@ export default async function LinkDisabledPage() {
   return (
     <AuthCard
       title="Link disabled"
-      description="This QR code or link was disabled because its destination was reported as harmful, for example phishing or malware."
+      description="This QR code or link was disabled because its destination was reported as harmful."
     />
   )
 }

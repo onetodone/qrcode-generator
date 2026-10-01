@@ -8,6 +8,11 @@ const appUrl =
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
+      url: `${appUrl}/`,
+      changeFrequency: 'monthly',
+      priority: 1,
+    },
+    {
       url: `${appUrl}/login`,
       changeFrequency: 'yearly',
       priority: 0.8,

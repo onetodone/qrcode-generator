@@ -81,7 +81,7 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
   })
 
   revalidatePath('/profile')
-  revalidatePath('/')
+  revalidatePath('/qrcodes')
   return { success: true }
 }
 

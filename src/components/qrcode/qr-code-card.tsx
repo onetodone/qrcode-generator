@@ -148,7 +148,7 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
             size="icon-sm"
             nativeButton={false}
             aria-label="Edit QR code"
-            render={<Link href={`/qr-codes/${qrCode.id}/edit`} />}
+            render={<Link href={`/qrcodes/${qrCode.id}/edit`} />}
           >
             <PencilIcon />
           </Button>

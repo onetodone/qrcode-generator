@@ -65,7 +65,7 @@ export function QrCodeForm({
   useActionResult(state, {
     onSuccess: () => {
       toast.success(successMessage)
-      router.push('/')
+      router.push('/qrcodes')
     },
   })
 
@@ -162,7 +162,7 @@ export function QrCodeForm({
           <div className="mt-4 flex flex-col gap-4 md:col-span-2 md:row-start-2">
             {state?.error ? <FieldError>{state.error}</FieldError> : null}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" nativeButton={false} render={<Link href="/" />}>
+              <Button type="button" variant="ghost" nativeButton={false} render={<Link href="/qrcodes" />}>
                 Cancel
               </Button>
               <Button type="submit" disabled={pending}>
