@@ -34,7 +34,7 @@ deployed.
 - [Auth.js (NextAuth) v5](https://authjs.dev) — credentials-based auth, JWT sessions
 - [Zod](https://zod.dev) for validation
 - [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) for the QR matrix, rendered to a custom SVG
-- [Nodemailer](https://nodemailer.com) for transactional email
+- [@onetodone/mailer](https://github.com/onetodone/mailer) for transactional email, sent over SMTP with [Nodemailer](https://nodemailer.com)
 
 ## Getting started
 
@@ -68,6 +68,7 @@ deployed.
    | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`               | Outgoing mail server (email confirmation, password reset).            |
    | `SMTP_SECURE` / `SMTP_REQUIRE_TLS`                                  | Encryption, `true`/`1`, `false`/`0` or empty. `SMTP_SECURE=true` connects over TLS from the start (default on port 465); `SMTP_REQUIRE_TLS=true` requires a STARTTLS upgrade. Use port 465, or 587 with `SMTP_REQUIRE_TLS=true`. |
    | `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME`                                | "From" identity on outgoing email (defaults to `SMTP_USER`).          |
+   | `SUPPORT_EMAIL`                                                     | Support address shown in the footer of every outgoing email. Required. |
    | `SAFE_BROWSING_API_KEY`                                             | Google Safe Browsing API key (optional). Empty turns destination checks off. See [Unsafe destinations](#unsafe-destinations). |
 
 3. Apply database migrations:
@@ -98,8 +99,9 @@ automatically:
 
 ```bash
 cp .env.example .env
-# fill in AUTH_SECRET and the SMTP_* settings in .env (DATABASE_URL there is
-# ignored — Compose points the app at its own bundled Postgres instead)
+# fill in AUTH_SECRET, SUPPORT_EMAIL and the SMTP_* settings in .env
+# (DATABASE_URL there is ignored — Compose points the app at its own bundled
+# Postgres instead)
 docker compose up --build
 ```
 
@@ -107,10 +109,10 @@ The app is then available at `http://localhost:3000` (override with `PORT`
 in `.env`). Data persists in a named Docker volume across restarts.
 
 Sign-in requires a confirmed email address, so Compose refuses to start without
-`SMTP_HOST` and `SMTP_PORT`. They must point at a mail server reachable from
-the container (`localhost` inside the container is the container itself). Set
-`APP_URL` to the address users open the app at — links in outgoing email are
-built from it.
+`SMTP_HOST`, `SMTP_PORT` and `SUPPORT_EMAIL`. The SMTP settings must point at a
+mail server reachable from the container (`localhost` inside the container is
+the container itself). Set `APP_URL` to the address users open the app at —
+links in outgoing email are built from it.
 
 ## Unsafe destinations
 
