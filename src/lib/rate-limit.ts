@@ -49,6 +49,21 @@ export function rateLimit(key: string, { limit, windowMs }: { limit: number; win
   }
 }
 
+/**
+ * Takes back one attempt recorded by `rateLimit`. Used for attempts that turn
+ * out not to count; recording first and refunding later keeps concurrent
+ * requests from all passing a check made before any of them is recorded.
+ */
+export function refundRateLimit(key: string): void {
+  const bucket = buckets.get(key)
+  if (bucket && bucket.count > 0) bucket.count -= 1
+}
+
+/** Forgets every attempt recorded for `key`. */
+export function clearRateLimit(key: string): void {
+  buckets.delete(key)
+}
+
 /** User-facing "try again later" message, rounded up to whole minutes. */
 export function tooManyAttemptsMessage(retryAfterMs: number): string {
   const minutes = Math.max(1, Math.ceil(retryAfterMs / 60_000))
