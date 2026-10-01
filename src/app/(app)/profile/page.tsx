@@ -16,7 +16,7 @@ export default async function ProfilePage() {
   // carry emailVerified, and it wouldn't reflect a change made this request.
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { emailVerified: true, pendingEmail: true },
+    select: { email: true, emailVerified: true, pendingEmail: true },
   })
 
   return (
@@ -24,7 +24,7 @@ export default async function ProfilePage() {
       <PageHeader title="Profile" description="Manage your account details." />
       <ProfileForm
         defaultName={session.user.name ?? ''}
-        defaultEmail={session.user.email ?? ''}
+        defaultEmail={user?.email ?? session.user.email ?? ''}
         emailVerified={Boolean(user?.emailVerified)}
         pendingEmail={user?.pendingEmail ?? null}
       />

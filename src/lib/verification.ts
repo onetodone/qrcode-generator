@@ -3,7 +3,8 @@ import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { getMailer } from '@/lib/email'
 
-const RESEND_COOLDOWN_MS = 120 * 1000
+/** Minimum time between two links of one type to one address. */
+export const RESEND_COOLDOWN_MS = 120 * 1000
 
 const TOKEN_TTL_MS: Record<VerificationTokenType, number> = {
   EMAIL_VERIFY: 24 * 60 * 60 * 1000,
@@ -34,16 +35,20 @@ function sendTokenEmail(type: VerificationTokenType, to: string, url: string) {
 /**
  * Issues a single-use token of `type` for `email` and emails the link; once
  * sent, it replaces any earlier token. Returns false without sending when the
- * previous token is less than 2 minutes old. Throws when the email can't be
+ * previous token is less than 2 minutes old, unless `ignoreCooldown` is set
+ * by a caller that limits sends on its own. Throws when the email can't be
  * sent, leaving the earlier link valid.
  */
 export async function sendVerificationEmail(
   email: string,
   type: VerificationTokenType = VerificationTokenType.EMAIL_VERIFY,
+  { ignoreCooldown = false }: { ignoreCooldown?: boolean } = {},
 ): Promise<boolean> {
-  const existing = await prisma.verificationToken.findFirst({ where: { identifier: email, type } })
-  if (existing && Date.now() - existing.createdAt.getTime() < RESEND_COOLDOWN_MS) {
-    return false
+  if (!ignoreCooldown) {
+    const existing = await prisma.verificationToken.findFirst({ where: { identifier: email, type } })
+    if (existing && Date.now() - existing.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+      return false
+    }
   }
 
   const token = crypto.randomBytes(32).toString('hex')

@@ -1,7 +1,6 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { after } from 'next/server'
 import { AuthError } from 'next-auth'
 import {
   clearLoginAttempts,
@@ -10,13 +9,23 @@ import {
   RateLimitedSignin,
   signIn,
   signOut,
+  VerificationTokenInvalidSignin,
 } from '@/auth'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
-import { sendVerificationEmail } from '@/lib/verification'
+import { RESEND_COOLDOWN_MS, sendVerificationEmail } from '@/lib/verification'
+import { sendAccountExistsEmail } from '@/lib/account-emails'
+import { afterResponse } from '@/lib/after-response'
 import { storeHandoffCookie } from '@/lib/handoff-cookies'
-import { emailSchema, loginSchema, registerSchema, resetPasswordSchema } from '@/schemas/auth'
-import { rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
+import {
+  confirmAccountSchema,
+  confirmEmailSchema,
+  emailSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from '@/schemas/auth'
+import { rateLimit, refundRateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
 import { getClientIp } from '@/lib/request'
 import { firstZodError, type FormState } from '@/lib/forms'
 import { hashPassword } from '@/lib/password'
@@ -26,17 +35,6 @@ const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 const ONE_HOUR_MS = 60 * 60 * 1000
 
 const CONFIRMATION_EMAIL_FAILED = "We couldn't send the confirmation email. Please try again in a few minutes."
-
-/** Runs `task` after the response is sent; a failure is only logged. */
-function afterResponse(event: string, task: () => Promise<unknown>): void {
-  after(async () => {
-    try {
-      await task()
-    } catch (error) {
-      logger.error(event, { error })
-    }
-  })
-}
 
 /**
  * Signs in with email and password. An unconfirmed account gets a fresh
@@ -83,9 +81,41 @@ export async function logoutAction(): Promise<void> {
 }
 
 /**
- * Creates an account and emails the confirmation link. Sign-in stays blocked
- * until the address is confirmed. When the email can't be sent, the account
- * is removed again and the form shows an error. Rate-limited per IP.
+ * Sends the one email a registration produces: the confirmation link to a new
+ * or unconfirmed account, or a note to a confirmed one that it already exists.
+ * Throws when the email can't be sent; a just-created account is removed again.
+ */
+async function sendRegistrationEmail(name: string, email: string): Promise<void> {
+  const existing = await prisma.user.findUnique({ where: { email } })
+
+  if (existing?.emailVerified) {
+    await sendAccountExistsEmail(existing)
+    return
+  }
+
+  // The resend cooldown is ignored: skipping the email would make this path
+  // answer faster than the others. `registerAction` limits sends per address.
+  if (existing) {
+    await sendVerificationEmail(email, VerificationTokenType.EMAIL_VERIFY, { ignoreCooldown: true })
+    await prisma.user.update({ where: { id: existing.id }, data: { name } })
+    return
+  }
+
+  const user = await prisma.user.create({ data: { name, email } })
+  try {
+    await sendVerificationEmail(email, VerificationTokenType.EMAIL_VERIFY, { ignoreCooldown: true })
+  } catch (error) {
+    await prisma.user.delete({ where: { id: user.id } })
+    throw error
+  }
+}
+
+/**
+ * Starts a registration and redirects to `/verify-email`. Every address gets
+ * the same answer and one email, so the form can't be used to probe for
+ * accounts; the password is chosen when the address is confirmed. When the
+ * email can't be sent, the form shows an error. Rate-limited per IP and per
+ * address.
  */
 export async function registerAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const register = rateLimit(`register:${await getClientIp()}`, { limit: 5, windowMs: ONE_HOUR_MS })
@@ -96,39 +126,68 @@ export async function registerAction(_prevState: FormState, formData: FormData):
   const parsed = registerSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),
-    password: formData.get('password'),
   })
 
   if (!parsed.success) {
     return { error: firstZodError(parsed.error) }
   }
 
-  const existing = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
-  })
-  if (existing) {
-    return { error: 'An account with this email already exists.' }
+  const { name, email } = parsed.data
+  const addressKey = `register:email:${email.toLowerCase()}`
+  const address = rateLimit(addressKey, { limit: 1, windowMs: RESEND_COOLDOWN_MS })
+  if (!address.ok) {
+    return { error: tooManyAttemptsMessage(address.retryAfterMs) }
   }
-
-  const user = await prisma.user.create({
-    data: {
-      name: parsed.data.name,
-      email: parsed.data.email,
-      password: await hashPassword(parsed.data.password),
-    },
-  })
 
   try {
-    await sendVerificationEmail(parsed.data.email)
+    await sendRegistrationEmail(name, email)
   } catch (error) {
     logger.error('auth.register_email_failed', { error })
-    // Otherwise the retry would hit "An account with this email already exists."
-    await prisma.user.delete({ where: { id: user.id } })
-    return { error: CONFIRMATION_EMAIL_FAILED }
+    refundRateLimit(addressKey)
+    return { error: "We couldn't send the email. Please try again in a few minutes." }
   }
 
-  await storeHandoffCookie('pendingEmail', parsed.data.email)
+  await storeHandoffCookie('pendingEmail', email)
   redirect('/verify-email')
+}
+
+/**
+ * Confirms an email address from the `/confirm-email` page: a new account's
+ * address together with the password it chooses, or the new address of an
+ * email change. Signs in and redirects to `/qrcodes`. When the link turned
+ * invalid or expired, the page is loaded again and explains it. Rate-limited
+ * per IP.
+ */
+export async function confirmEmailAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const confirm = rateLimit(`confirm-email:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
+  if (!confirm.ok) {
+    return { error: tooManyAttemptsMessage(confirm.retryAfterMs) }
+  }
+
+  const token = formData.get('token')
+  const parsed = formData.has('newPassword')
+    ? confirmAccountSchema.safeParse({
+        token,
+        newPassword: formData.get('newPassword'),
+        confirmPassword: formData.get('confirmPassword'),
+      })
+    : confirmEmailSchema.safeParse({ token })
+  if (!parsed.success) {
+    return { error: firstZodError(parsed.error) }
+  }
+
+  try {
+    await signIn('credentials', {
+      verificationToken: parsed.data.token,
+      ...('newPassword' in parsed.data ? { password: parsed.data.newPassword } : {}),
+      redirectTo: '/qrcodes',
+    })
+  } catch (error) {
+    if (error instanceof VerificationTokenInvalidSignin) {
+      redirect('/confirm-email')
+    }
+    throw error
+  }
 }
 
 /**
@@ -196,8 +255,8 @@ export async function forgotPasswordAction(_prevState: FormState, formData: Form
 
 /**
  * Sets a new password from a reset token, revokes every existing session of
- * the account and lifts its failed sign-in limit. Does not sign in.
- * Rate-limited per IP.
+ * the account, lifts its failed sign-in limit and confirms its email if it
+ * wasn't yet. Does not sign in. Rate-limited per IP.
  */
 export async function resetPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const reset = rateLimit(`reset-password:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
@@ -234,7 +293,12 @@ export async function resetPasswordAction(_prevState: FormState, formData: FormD
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { password: await hashPassword(parsed.data.newPassword), passwordChangedAt: new Date() },
+    data: {
+      password: await hashPassword(parsed.data.newPassword),
+      passwordChangedAt: new Date(),
+      // The link proves the mailbox, and its holder chose the password.
+      emailVerified: user.emailVerified ?? new Date(),
+    },
   })
   clearLoginAttempts(user.email)
 

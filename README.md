@@ -18,7 +18,9 @@ deployed.
 - **Smart endpoint detection** — paste a URL, phone number, or email address
   as the destination and it's validated and normalized accordingly.
 - **Multi-user** — each account manages its own set of QR codes; email +
-  password authentication with email confirmation and password reset.
+  password authentication with email confirmation and password reset. The
+  password is chosen when the email address is confirmed, and an email change
+  needs the current password and is announced to the old address.
 - **Editable metadata** — update a code's destination, note, or design after
   creation without regenerating the QR image itself.
 - **Unsafe destination protection** — destinations are checked against

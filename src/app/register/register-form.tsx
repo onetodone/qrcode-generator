@@ -14,14 +14,16 @@ export function RegisterForm() {
   // uncontrolled fields after any Server Action completes, error or not.
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [state, action, pending] = useActionState<FormState, FormData>(registerAction, undefined)
 
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
         <CardTitle>Create an account</CardTitle>
-        <CardDescription>Register to manage your own QR codes.</CardDescription>
+        <CardDescription>
+          Register to manage your own QR codes. We&apos;ll email you a link to confirm your address and choose a
+          password.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={action}>
@@ -51,21 +53,6 @@ export function RegisterForm() {
                   onChange={(event) => setEmail(event.target.value)}
                   required
                   autoComplete="email"
-                />
-              </FieldContent>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="password">Password</FieldLabel>
-              <FieldContent>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
                 />
               </FieldContent>
             </Field>

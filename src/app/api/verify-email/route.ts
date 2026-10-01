@@ -1,10 +1,12 @@
 import { after, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { signIn, VerificationTokenExpiredSignin, VerificationTokenInvalidSignin } from '@/auth'
 import { logRequest } from '@/lib/logger'
 import { setHandoffCookie } from '@/lib/handoff-cookies'
 import { clientIpFromHeaders } from '@/lib/request'
 
+// The token is only handed to `/confirm-email`, which asks for a click before
+// using it: link scanners that open the link don't use it up, and a link
+// alone can't sign anyone in.
 export async function GET(request: Request) {
   const start = performance.now()
   const requestHeaders = await headers()
@@ -23,17 +25,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/verify-email', request.url))
   }
 
-  try {
-    await signIn('credentials', { verificationToken: token, redirectTo: '/qrcodes' })
-  } catch (error) {
-    if (error instanceof VerificationTokenExpiredSignin) {
-      const response = NextResponse.redirect(new URL('/verify-email?status=expired', request.url))
-      setHandoffCookie(response, 'pendingEmail', error.email, requestHeaders)
-      return response
-    }
-    if (error instanceof VerificationTokenInvalidSignin) {
-      return NextResponse.redirect(new URL('/verify-email?status=invalid', request.url))
-    }
-    throw error
-  }
+  const response = NextResponse.redirect(new URL('/confirm-email', request.url))
+  setHandoffCookie(response, 'confirmToken', token, requestHeaders)
+  return response
 }
