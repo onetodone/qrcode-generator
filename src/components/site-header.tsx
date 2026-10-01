@@ -25,6 +25,16 @@ function HeaderShell({ logoHref, children }: { logoHref: string; children: React
   )
 }
 
+function SignOutForm() {
+  return (
+    <form action={logoutAction}>
+      <SubmitButton variant="outline" pendingLabel="Signing out...">
+        Sign out
+      </SubmitButton>
+    </form>
+  )
+}
+
 export function SiteHeader({ userName }: { userName?: string | null }) {
   return (
     <HeaderShell logoHref="/qrcodes">
@@ -35,23 +45,22 @@ export function SiteHeader({ userName }: { userName?: string | null }) {
         Profile
       </Button>
       {userName && <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>}
-      <form action={logoutAction}>
-        <SubmitButton variant="outline" pendingLabel="Signing out...">
-          Sign out
-        </SubmitButton>
-      </form>
+      <SignOutForm />
     </HeaderShell>
   )
 }
 
-/** Header for public pages: sign-in and registration links for guests, the dashboard link otherwise. */
+/** Header for public pages: sign-in and registration links for guests, the dashboard link and sign-out otherwise. */
 export function PublicHeader({ signedIn }: { signedIn: boolean }) {
   return (
     <HeaderShell logoHref="/">
       {signedIn ? (
-        <Button nativeButton={false} render={<Link href="/qrcodes" />}>
-          My QR Codes
-        </Button>
+        <>
+          <Button nativeButton={false} render={<Link href="/qrcodes" />}>
+            My QR Codes
+          </Button>
+          <SignOutForm />
+        </>
       ) : (
         <>
           <Button variant="ghost" nativeButton={false} render={<Link href="/login" />}>
