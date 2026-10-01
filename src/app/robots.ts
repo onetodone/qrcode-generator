@@ -9,8 +9,8 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
-      // The more specific `allow` paths take precedence over `Disallow: /`.
-      allow: ['/login', '/register', '/forgot-password'],
+      // The more specific `allow` paths take precedence over `Disallow: /`; `/$` matches only the landing page.
+      allow: ['/$', '/login', '/register', '/forgot-password'],
       disallow: '/',
     },
     sitemap: `${appUrl}/sitemap.xml`,

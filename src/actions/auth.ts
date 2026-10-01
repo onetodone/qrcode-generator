@@ -53,7 +53,7 @@ export async function loginAction(_prevState: FormState, formData: FormData): Pr
     await signIn('credentials', {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: '/',
+      redirectTo: '/qrcodes',
     })
   } catch (error) {
     if (error instanceof EmailNotVerifiedSignin) {

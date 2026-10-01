@@ -20,8 +20,7 @@ const DAILY_CREATE_LIMIT = 10
 const SAVE_RATE_LIMIT = { limit: 30, windowMs: HOUR_MS }
 
 const NOT_SIGNED_IN = 'You must be signed in.'
-const UNSAFE_DESTINATION =
-  'Google Safe Browsing flags this destination as unsafe (for example phishing or malware), so it can’t be used.'
+const UNSAFE_DESTINATION = 'This destination is flagged as unsafe, so it can’t be used.'
 
 function isRecordNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
@@ -110,7 +109,7 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
     }
   }
 
-  revalidatePath('/')
+  revalidatePath('/qrcodes')
   return { success: true }
 }
 
@@ -178,7 +177,7 @@ export async function updateQrCodeAction(_prevState: FormState, formData: FormDa
     throw error
   }
 
-  revalidatePath('/')
+  revalidatePath('/qrcodes')
   return { success: true }
 }
 
@@ -197,5 +196,5 @@ export async function deleteQrCodeAction(id: unknown): Promise<void> {
     if (!isRecordNotFound(error)) throw error
   }
 
-  revalidatePath('/')
+  revalidatePath('/qrcodes')
 }

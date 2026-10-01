@@ -5,7 +5,7 @@ import { clientIpFromHeaders } from '@/lib/request'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password']
 // Open to guests and signed-in users alike; matched exactly.
-const publicRoutes = ['/link-disabled']
+const publicRoutes = ['/', '/link-disabled']
 
 const isDev = process.env.NODE_ENV !== 'production'
 const cspConnectSrcExtra = process.env.CSP_CONNECT_SRC_EXTRA?.trim() ?? ''
@@ -43,7 +43,7 @@ export default auth((req) => {
   if (!isLoggedIn && !isPublicOnlyRoute && !isPublicRoute) {
     response = NextResponse.redirect(new URL('/login', nextUrl))
   } else if (isLoggedIn && isPublicOnlyRoute) {
-    response = NextResponse.redirect(new URL('/', nextUrl))
+    response = NextResponse.redirect(new URL('/qrcodes', nextUrl))
   } else {
     response = NextResponse.next({ request: { headers: requestHeaders } })
   }
