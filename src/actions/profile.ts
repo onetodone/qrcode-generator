@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { unstable_update } from '@/auth'
+import { AuthError } from 'next-auth'
+import { signIn, unstable_update } from '@/auth'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
@@ -76,9 +77,8 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
     })
   }
 
-  await unstable_update({
-    user: { name: parsed.data.name },
-  })
+  // The `jwt` callback reads the name from the database.
+  await unstable_update({})
 
   revalidatePath('/profile')
   revalidatePath('/qrcodes')
@@ -87,7 +87,8 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
 
 /**
  * Changes the signed-in user's password after checking the current one. Other
- * sessions are revoked; the current one stays signed in.
+ * sessions are revoked; the current one is issued again with the new password
+ * and stays signed in.
  */
 export async function changePasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
@@ -118,7 +119,14 @@ export async function changePasswordAction(_prevState: FormState, formData: Form
     data: { password: await hashPassword(parsed.data.newPassword), passwordChangedAt: new Date() },
   })
 
-  await unstable_update({ user: {} })
+  // A session update can't renew a revoked session, so sign in again.
+  try {
+    await signIn('credentials', { email: user.email, password: parsed.data.newPassword, redirect: false })
+  } catch (error) {
+    if (!(error instanceof AuthError)) throw error
+    // The password is saved; this session ends at its next check.
+    logger.warn('profile.session_reissue_failed', { error })
+  }
 
   return { success: true }
 }

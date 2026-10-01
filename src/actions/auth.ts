@@ -3,7 +3,14 @@
 import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { AuthError } from 'next-auth'
-import { ConfirmationEmailFailedSignin, EmailNotVerifiedSignin, signIn, signOut } from '@/auth'
+import {
+  clearLoginAttempts,
+  ConfirmationEmailFailedSignin,
+  EmailNotVerifiedSignin,
+  RateLimitedSignin,
+  signIn,
+  signOut,
+} from '@/auth'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
@@ -32,14 +39,10 @@ function afterResponse(event: string, task: () => Promise<unknown>): void {
 
 /**
  * Signs in with email and password. An unconfirmed account gets a fresh
- * confirmation link and is redirected to `/verify-email`. Rate-limited per IP.
+ * confirmation link and is redirected to `/verify-email`. Failed attempts are
+ * rate-limited per IP and per email in `authorize()`.
  */
 export async function loginAction(_prevState: FormState, formData: FormData): Promise<FormState> {
-  const login = rateLimit(`login:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
-  if (!login.ok) {
-    return { error: tooManyAttemptsMessage(login.retryAfterMs) }
-  }
-
   const parsed = loginSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
@@ -61,6 +64,9 @@ export async function loginAction(_prevState: FormState, formData: FormData): Pr
     }
     if (error instanceof ConfirmationEmailFailedSignin) {
       return { error: CONFIRMATION_EMAIL_FAILED }
+    }
+    if (error instanceof RateLimitedSignin) {
+      return { error: tooManyAttemptsMessage(error.retryAfterMs) }
     }
     if (error instanceof AuthError) {
       return { error: 'Invalid email or password.' }
@@ -186,8 +192,9 @@ export async function forgotPasswordAction(_prevState: FormState, formData: Form
 }
 
 /**
- * Sets a new password from a reset token and revokes every existing session
- * of the account. Does not sign in. Rate-limited per IP.
+ * Sets a new password from a reset token, revokes every existing session of
+ * the account and lifts its failed sign-in limit. Does not sign in.
+ * Rate-limited per IP.
  */
 export async function resetPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const reset = rateLimit(`reset-password:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
@@ -226,6 +233,7 @@ export async function resetPasswordAction(_prevState: FormState, formData: FormD
     where: { id: user.id },
     data: { password: await hashPassword(parsed.data.newPassword), passwordChangedAt: new Date() },
   })
+  clearLoginAttempts(user.email)
 
   return { success: true }
 }
