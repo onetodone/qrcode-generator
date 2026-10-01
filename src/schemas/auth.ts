@@ -1,10 +1,11 @@
 import * as z from 'zod'
 import { confirmPasswordField, passwordField, passwordsMatch, passwordsMatchError } from '@/schemas/password'
 
-/** Registration form: name and email. The password is chosen when the email is confirmed. */
+/** Registration form: name, email and agreement to the terms. The password is chosen when the email is confirmed. */
 export const registerSchema = z.object({
   name: z.string().min(2, { error: 'Name must be at least 2 characters.' }).max(100).trim(),
   email: z.email({ error: 'Please enter a valid email address.' }).trim(),
+  acceptTerms: z.literal('on', { error: 'Please agree to the Terms of Use to create an account.' }),
 })
 
 /** Sign-in form: email and password. */

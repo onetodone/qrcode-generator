@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import Link from 'next/link'
 import { confirmEmailAction } from '@/actions/auth'
 import type { FormState } from '@/lib/forms'
 import { Button } from '@/components/ui/button'
@@ -73,6 +74,19 @@ export function ConfirmEmailForm({
                   </FieldContent>
                 </Field>
               </>
+            )}
+            {choosePassword && (
+              <p className="text-sm text-muted-foreground">
+                By confirming, you agree to the{' '}
+                <Link href="/terms-of-use" target="_blank" className="underline underline-offset-4">
+                  Terms of Use
+                </Link>{' '}
+                and confirm you have read the{' '}
+                <Link href="/privacy-policy" target="_blank" className="underline underline-offset-4">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
             )}
             {state?.error && <FieldError>{state.error}</FieldError>}
             <Button type="submit" disabled={pending} className="w-full">

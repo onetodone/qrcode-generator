@@ -6,6 +6,7 @@ import { registerAction } from '@/actions/auth'
 import type { FormState } from '@/lib/forms'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
@@ -14,6 +15,7 @@ export function RegisterForm() {
   // uncontrolled fields after any Server Action completes, error or not.
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [acceptTerms, setAcceptTerms] = useState(false)
   const [state, action, pending] = useActionState<FormState, FormData>(registerAction, undefined)
 
   return (
@@ -55,6 +57,26 @@ export function RegisterForm() {
                   autoComplete="email"
                 />
               </FieldContent>
+            </Field>
+            <Field orientation="horizontal">
+              <Checkbox
+                id="acceptTerms"
+                name="acceptTerms"
+                checked={acceptTerms}
+                onCheckedChange={setAcceptTerms}
+                required
+              />
+              <FieldLabel htmlFor="acceptTerms" className="block font-normal">
+                I agree to the{' '}
+                <Link href="/terms-of-use" target="_blank" className="underline underline-offset-4">
+                  Terms of Use
+                </Link>{' '}
+                and have read the{' '}
+                <Link href="/privacy-policy" target="_blank" className="underline underline-offset-4">
+                  Privacy Policy
+                </Link>
+                .
+              </FieldLabel>
             </Field>
             {state?.error && <FieldError>{state.error}</FieldError>}
             <Button type="submit" disabled={pending} className="w-full">

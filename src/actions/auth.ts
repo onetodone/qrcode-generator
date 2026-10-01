@@ -97,11 +97,11 @@ async function sendRegistrationEmail(name: string, email: string): Promise<void>
   // answer faster than the others. `registerAction` limits sends per address.
   if (existing) {
     await sendVerificationEmail(email, VerificationTokenType.EMAIL_VERIFY, { ignoreCooldown: true })
-    await prisma.user.update({ where: { id: existing.id }, data: { name } })
+    await prisma.user.update({ where: { id: existing.id }, data: { name, termsAcceptedAt: new Date() } })
     return
   }
 
-  const user = await prisma.user.create({ data: { name, email } })
+  const user = await prisma.user.create({ data: { name, email, termsAcceptedAt: new Date() } })
   try {
     await sendVerificationEmail(email, VerificationTokenType.EMAIL_VERIFY, { ignoreCooldown: true })
   } catch (error) {
@@ -126,6 +126,7 @@ export async function registerAction(_prevState: FormState, formData: FormData):
   const parsed = registerSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),
+    acceptTerms: formData.get('acceptTerms'),
   })
 
   if (!parsed.success) {
