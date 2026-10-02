@@ -2,18 +2,19 @@
 
 import { revalidatePath } from 'next/cache'
 import { AuthError } from 'next-auth'
-import { signIn, unstable_update } from '@/auth'
+import { signIn, signOut, unstable_update } from '@/auth'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { sendEmailChangeRequestedNotice } from '@/lib/account-emails'
 import { afterResponse } from '@/lib/after-response'
-import { changePasswordSchema, updateProfileSchema } from '@/schemas/profile'
+import { changePasswordSchema, deleteAccountSchema, updateProfileSchema } from '@/schemas/profile'
 import { firstZodError, type FormState } from '@/lib/forms'
 import { hashPassword, verifyPassword } from '@/lib/password'
 import { rateLimit, refundRateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
 import { getClientIp } from '@/lib/request'
 import { getSessionUserId } from '@/lib/auth-guard'
+import { invalidateRedirect } from '@/lib/redirect-cache'
 import { logger } from '@/lib/logger'
 
 const NOT_SIGNED_IN = 'You must be signed in.'
@@ -176,5 +177,43 @@ export async function changePasswordAction(_prevState: FormState, formData: Form
     logger.warn('profile.session_reissue_failed', { error })
   }
 
+  return { success: true }
+}
+
+/**
+ * Deletes the signed-in user's account after checking the current password.
+ * Its QR codes go with it, so their links return 404, and so do pending
+ * confirmation and reset links. Signs out and redirects to `/account-deleted`.
+ * Other sessions of the account end at their next check.
+ */
+export async function deleteAccountAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const userId = await getSessionUserId()
+  if (!userId) return { error: NOT_SIGNED_IN }
+
+  const parsed = deleteAccountSchema.safeParse({ currentPassword: formData.get('currentPassword') })
+  if (!parsed.success) {
+    return { error: firstZodError(parsed.error) }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, pendingEmail: true, password: true, qrCodes: { select: { urlHash: true } } },
+  })
+  if (!user) return { error: NOT_SIGNED_IN }
+
+  const passwordError = await checkCurrentPassword(userId, parsed.data.currentPassword, user.password)
+  if (passwordError) return { error: passwordError }
+
+  const identifiers = user.pendingEmail ? [user.email, user.pendingEmail] : [user.email]
+  await prisma.$transaction([
+    prisma.verificationToken.deleteMany({ where: { identifier: { in: identifiers } } }),
+    prisma.user.delete({ where: { id: userId } }),
+  ])
+  for (const { urlHash } of user.qrCodes) {
+    invalidateRedirect(urlHash)
+  }
+  logger.info('account.deleted', { userId, qrCodes: user.qrCodes.length })
+
+  await signOut({ redirectTo: '/account-deleted' })
   return { success: true }
 }
