@@ -19,7 +19,7 @@ function HeaderShell({ logoHref, children }: { logoHref: string; children: React
             priority
           />
         </Link>
-        <nav className="flex flex-wrap items-center gap-2">{children}</nav>
+        <nav className="flex flex-wrap items-center sm:gap-2">{children}</nav>
       </div>
     </header>
   )
