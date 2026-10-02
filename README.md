@@ -27,6 +27,10 @@ deployed.
   Google Safe Browsing when saved and re-checked after scans; flagged codes
   stop redirecting and show a warning page. Each account can create up to 10
   codes per 24 hours.
+- **Legal pages and privacy** — Terms of Use and Privacy Policy pages filled
+  in from the environment; registration requires agreeing to the terms; Google
+  Analytics loads only after a visitor accepts it in a cookie banner; users can
+  delete their account, with all its codes, from the profile.
 
 ## Tech stack
 
@@ -70,7 +74,10 @@ deployed.
    | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`               | Outgoing mail server (email confirmation, password reset).            |
    | `SMTP_SECURE` / `SMTP_REQUIRE_TLS`                                  | Encryption, `true`/`1`, `false`/`0` or empty. `SMTP_SECURE=true` connects over TLS from the start (default on port 465); `SMTP_REQUIRE_TLS=true` requires a STARTTLS upgrade. Use port 465, or 587 with `SMTP_REQUIRE_TLS=true`. |
    | `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME`                                | "From" identity on outgoing email (defaults to `SMTP_USER`).          |
-   | `SUPPORT_EMAIL`                                                     | Support address shown in the footer of every outgoing email. Required. |
+   | `SUPPORT_EMAIL`                                                     | Support address shown in the footer of every outgoing email and on the legal pages. Required. |
+   | `ABUSE_EMAIL`                                                       | Address for abuse reports on the Terms of Use page (optional, defaults to `SUPPORT_EMAIL`). |
+   | `LEGAL_OPERATOR_NAME` / `LEGAL_JURISDICTION`                        | Operator named on the legal pages, and the jurisdiction whose law governs the Terms (both optional). See [Legal pages](#legal-pages). |
+   | `GATAG_ID`                                                          | Google Analytics measurement ID (optional). Loads only after a visitor accepts analytics cookies; its origins must be added to `CSP_CONNECT_SRC_EXTRA`. |
    | `SAFE_BROWSING_API_KEY`                                             | Google Safe Browsing API key (optional). Empty turns destination checks off. See [Unsafe destinations](#unsafe-destinations). |
 
 3. Apply database migrations:
@@ -149,6 +156,25 @@ The scripts use `DATABASE_URL` from the environment, falling back to `.env`.
 With Docker Compose, run them in the `migrate` service:
 `docker compose run --rm migrate pnpm qr:disable <hash>`. Running app instances
 may keep serving a cached redirect for up to 60 seconds.
+
+## Legal pages
+
+`/terms-of-use` and `/privacy-policy` are public and linked from the footer,
+the sign-in pages and the registration form, where agreeing to the terms is
+required. They are rendered per request from the environment:
+
+- `LEGAL_OPERATOR_NAME` — the person or organization running the instance,
+  named as operator and data controller. Without it the pages describe the
+  operator generically.
+- `LEGAL_JURISDICTION` — the governing law and courts for the Terms. Without
+  it that section is left out.
+- `SUPPORT_EMAIL` and `ABUSE_EMAIL` — the contact and abuse-report addresses.
+- The Google Analytics and Safe Browsing sections appear only when `GATAG_ID`
+  and `SAFE_BROWSING_API_KEY` are set; the hosting provider is named only on
+  Vercel.
+
+The texts are a starting point, not legal advice. Review them, and adjust them
+to your jurisdiction and providers, before running a public instance.
 
 ## Scripts
 

@@ -6,7 +6,7 @@ import { clientIpFromHeaders } from '@/lib/request'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password']
 // Open to guests and signed-in users alike; matched exactly.
-const publicRoutes = ['/', '/link-disabled', '/confirm-email']
+const publicRoutes = ['/', '/link-disabled', '/confirm-email', '/terms-of-use', '/privacy-policy', '/account-deleted']
 
 const isDev = process.env.NODE_ENV !== 'production'
 const cspConnectSrcExtra = process.env.CSP_CONNECT_SRC_EXTRA?.trim() ?? ''

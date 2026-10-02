@@ -71,7 +71,8 @@ async function confirmEmail(token: string, password: unknown, request: Request):
 
   if (record.type === VerificationTokenType.EMAIL_VERIFY) {
     // Whoever confirms the address chooses the password, so a password set by
-    // someone who registered the address first never signs in.
+    // someone who registered the address first never signs in. For the same
+    // reason the confirmation page asks for agreement to the terms again.
     const parsed = passwordField.safeParse(password)
     if (!parsed.success) throw new VerificationTokenInvalidSignin()
     const passwordHash = await hashPassword(parsed.data)
@@ -82,7 +83,7 @@ async function confirmEmail(token: string, password: unknown, request: Request):
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { emailVerified: new Date(), password: passwordHash },
+      data: { emailVerified: new Date(), password: passwordHash, termsAcceptedAt: new Date() },
     })
     return { id: user.id, email: user.email, name: user.name }
   }

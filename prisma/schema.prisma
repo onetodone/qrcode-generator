@@ -16,6 +16,7 @@ model User {
   image         String?
   password      String?
   passwordChangedAt DateTime?
+  termsAcceptedAt   DateTime?
 
   accounts Account[]
   qrCodes  QrCode[]

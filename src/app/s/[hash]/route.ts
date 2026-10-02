@@ -2,11 +2,12 @@ import { after, NextResponse } from 'next/server'
 import { notFound } from 'next/navigation'
 import { isbot } from 'isbot'
 import { prisma } from '@/lib/prisma'
-import { logger, logRequest } from '@/lib/logger'
+import { logRequest } from '@/lib/logger'
 import { clientIpFromHeaders, isPrefetchRequest } from '@/lib/request'
 import { rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
 import { getCachedRedirect, redirectCacheGeneration, setCachedRedirect } from '@/lib/redirect-cache'
 import { isRecheckDue, recheckDestination } from '@/lib/destination-safety'
+import { afterResponse } from '@/lib/after-response'
 
 const REDIRECT_RATE_LIMIT = { limit: 60, windowMs: 60_000 }
 const DISABLED_LINK_PATH = '/link-disabled'
@@ -66,16 +67,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ hash
   const isRealScan =
     request.method === 'GET' && !isPrefetchRequest(request.headers) && !isbot(request.headers.get('user-agent') ?? '')
   if (isRealScan) {
-    after(async () => {
-      try {
-        await prisma.qrCode.update({
-          where: { urlHash: hash },
-          data: { views: { increment: 1 } },
-        })
-      } catch (error) {
-        logger.error('qr.view_increment_failed', { error, hash })
-      }
-    })
+    afterResponse(
+      'qr.view_increment_failed',
+      () => prisma.qrCode.update({ where: { urlHash: hash }, data: { views: { increment: 1 } } }),
+      { hash },
+    )
   }
 
   return NextResponse.redirect(target.leadsTo)
