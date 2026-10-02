@@ -25,8 +25,9 @@ deployed.
   creation without regenerating the QR image itself.
 - **Unsafe destination protection** — destinations are checked against
   Google Safe Browsing when saved and re-checked after scans; flagged codes
-  stop redirecting and show a warning page. Each account can create up to 10
-  codes per 24 hours.
+  stop redirecting and show a warning page. Destinations behind URL shorteners
+  or on bare IP addresses are rejected. Each account can create up to 10 codes
+  per 24 hours.
 - **Legal pages and privacy** — Terms of Use and Privacy Policy pages filled
   in from the environment; registration requires agreeing to the terms; Google
   Analytics loads only after a visitor accepts it in a cookie banner; users can
@@ -136,6 +137,13 @@ With `SAFE_BROWSING_API_KEY` set, every web destination is looked up in
   after that. A flagged code is disabled: its `/s/[hash]` link opens
   `/link-disabled` instead of the destination and scans aren't counted. Saving
   the code with a safe destination enables it again.
+
+With or without a key, a destination is rejected on save when it carries a
+username or password (`https://bank.example@evil.example`), is another code's
+`/s/` link, uses an IP address instead of a domain name, or goes through a URL
+shortener or redirect page (listed in `src/lib/url-shorteners.ts`), since those
+hide the final address from the lookup. Stored destinations aren't re-validated
+against these rules.
 
 To get a key, create a Google Cloud project, enable the **Safe Browsing API**,
 and create an API key restricted to that API. The Safe Browsing API is free for

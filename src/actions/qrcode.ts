@@ -4,7 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { Prisma, QrDisabledReason } from '@/generated/client'
 import { qrCodeFormSchema, type QrCodeFormInput } from '@/schemas/qrcode'
-import { generateUrlHash, hasUrlCredentials, isOwnRedirectLink, normalizeLeadsTo } from '@/lib/qrcode'
+import {
+  generateUrlHash,
+  hasIpAddressHost,
+  hasUrlCredentials,
+  isOwnRedirectLink,
+  isUrlShortener,
+  normalizeLeadsTo,
+} from '@/lib/qrcode'
 import { firstZodError, type FormState } from '@/lib/forms'
 import { getSessionUserId } from '@/lib/auth-guard'
 import { invalidateRedirect } from '@/lib/redirect-cache'
@@ -44,6 +51,12 @@ async function parseQrCodeForm(formData: FormData): Promise<{ data: QrCodeFormIn
   }
   if (hasUrlCredentials(leadsTo)) {
     return { error: 'Endpoint can’t contain a username or password (user@host).' }
+  }
+  if (hasIpAddressHost(leadsTo)) {
+    return { error: 'Use a domain name, not an IP address.' }
+  }
+  if (isUrlShortener(leadsTo)) {
+    return { error: 'Links through URL shorteners aren’t allowed. Use the final address.' }
   }
   if (isOwnRedirectLink(leadsTo, await getAppHostnames())) {
     return { error: 'Endpoint can’t be the tracking link of another QR code.' }
