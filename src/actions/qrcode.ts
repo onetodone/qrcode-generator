@@ -27,7 +27,13 @@ const DAILY_CREATE_LIMIT = 10
 const SAVE_RATE_LIMIT = { limit: 30, windowMs: HOUR_MS }
 
 const NOT_SIGNED_IN = 'You must be signed in.'
+const ACCOUNT_SUSPENDED = 'This account has been suspended. Contact support.'
 const UNSAFE_DESTINATION = 'This destination is flagged as unsafe, so it can’t be used.'
+
+async function isAccountSuspended(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { suspendedAt: true } })
+  return user?.suspendedAt !== null && user?.suspendedAt !== undefined
+}
 
 function isRecordNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
@@ -91,6 +97,7 @@ async function dailyCreateLimitError(userId: string): Promise<string | null> {
 export async function createQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
+  if (await isAccountSuspended(userId)) return { error: ACCOUNT_SUSPENDED }
 
   const rateLimitError = saveRateLimitError(userId)
   if (rateLimitError) return { error: rateLimitError }
@@ -135,6 +142,7 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
 export async function updateQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
+  if (await isAccountSuspended(userId)) return { error: ACCOUNT_SUSPENDED }
 
   const id = formData.get('id')
   if (typeof id !== 'string' || !id) {
