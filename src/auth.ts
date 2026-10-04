@@ -17,6 +17,10 @@ export class EmailNotVerifiedSignin extends CredentialsSignin {
   code = 'email_not_verified'
 }
 
+export class AccountSuspendedSignin extends CredentialsSignin {
+  code = 'account_suspended'
+}
+
 export class ConfirmationEmailFailedSignin extends CredentialsSignin {
   code = 'confirmation_email_failed'
 }
@@ -43,12 +47,13 @@ export function clearLoginAttempts(email: string): void {
   clearRateLimit(loginEmailKey(email))
 }
 
-async function passwordChangedAtMs(userId: string): Promise<number | null> {
+/** `passwordChangedAt` in ms, or `null` when the account is gone or suspended, so its sessions end. */
+async function activePasswordChangedAtMs(userId: string): Promise<number | null> {
   const record = await prisma.user.findUnique({
     where: { id: userId },
-    select: { passwordChangedAt: true },
+    select: { passwordChangedAt: true, suspendedAt: true },
   })
-  if (!record) return null
+  if (!record || record.suspendedAt) return null
   return record.passwordChangedAt?.getTime() ?? 0
 }
 
@@ -163,6 +168,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         if (!user || !passwordsMatch) return null
         refundAttempt()
 
+        if (user.suspendedAt) throw new AccountSuspendedSignin()
+
         if (!user.emailVerified) {
           try {
             await sendVerificationEmail(user.email)
@@ -183,7 +190,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         // Just verified in `authorize()` moments ago — no need to re-check.
         const userId = user.id as string
         token.id = userId
-        token.passwordChangedAt = (await passwordChangedAtMs(userId)) ?? 0
+        const changedAt = await activePasswordChangedAtMs(userId)
+        if (changedAt === null) return null
+        token.passwordChangedAt = changedAt
         token.checkedAt = Date.now()
         return token
       }
@@ -198,9 +207,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       if (trigger === 'update') {
         const record = await prisma.user.findUnique({
           where: { id: userId },
-          select: { name: true, email: true, passwordChangedAt: true },
+          select: { name: true, email: true, passwordChangedAt: true, suspendedAt: true },
         })
-        if (!record) return null
+        if (!record || record.suspendedAt) return null
         if ((record.passwordChangedAt?.getTime() ?? 0) > issuedFor) return null
         token.name = record.name
         token.email = record.email
@@ -211,7 +220,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       const checkedAt = typeof token.checkedAt === 'number' ? token.checkedAt : 0
       if (Date.now() - checkedAt < SESSION_REVALIDATE_MS) return token
 
-      const changedAt = await passwordChangedAtMs(userId)
+      const changedAt = await activePasswordChangedAtMs(userId)
       if (changedAt === null) return null
       if (changedAt > issuedFor) return null
       token.checkedAt = Date.now()

@@ -35,8 +35,8 @@ export default async function PrivacyPolicyPage() {
         <li>Your name and email address, and a new address while you confirm a change of email.</li>
         <li>Your password, stored only as a bcrypt hash. We can’t read your password.</li>
         <li>
-          When your account was created, when you confirmed your email address, when you last changed your password, and
-          when you agreed to the Terms of Use.
+          When your account was created, when you confirmed your email address, when you last changed your password,
+          when you agreed to the Terms of Use, and when your account was suspended, if it was.
         </li>
         <li>
           Single-use links we email you to confirm an address or reset your password. They stop working after 24 hours

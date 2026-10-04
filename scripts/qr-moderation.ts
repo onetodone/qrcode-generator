@@ -1,26 +1,11 @@
-import 'dotenv/config'
-import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient, QrDisabledReason } from '../prisma/generated/client'
+import { QrDisabledReason } from '../prisma/generated/client'
+import { hashFromInput, prisma, runOperatorScript } from './operator'
 
 // Disables or re-enables QR codes by hand, e.g. after an abuse report.
-// `DATABASE_URL` from the environment wins over `.env`, so it can point at production.
 
 const USAGE = `Usage:
   pnpm qr:disable <hash|link> [--owner]   Disable the code, or with --owner every code of its owner
   pnpm qr:enable <hash|link> [--owner]    Lift a manual disable`
-
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
-const prisma = new PrismaClient({ adapter })
-
-function hashFromInput(input: string): string {
-  try {
-    const match = new URL(input).pathname.match(/^\/s\/([^/]+)/)
-    if (match?.[1]) return match[1]
-  } catch {
-    // Not a URL: treat it as a bare hash.
-  }
-  return input
-}
 
 async function main() {
   const [command, target, ...flags] = process.argv.slice(2)
@@ -57,11 +42,4 @@ async function main() {
   console.log('Running app instances may serve cached redirects for up to 60 s.')
 }
 
-main()
-  .catch((error) => {
-    console.error(error)
-    process.exitCode = 1
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+runOperatorScript(main)

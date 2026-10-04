@@ -165,6 +165,24 @@ With Docker Compose, run them in the `migrate` service:
 `docker compose run --rm migrate pnpm qr:disable <hash>`. Running app instances
 may keep serving a cached redirect for up to 60 seconds.
 
+## Account suspension
+
+An account that breaks the Terms of Use can be suspended by email address, QR
+hash or short link. Its enabled codes stop redirecting, and it can no longer
+sign in, create codes or edit them. Unsuspending restores the codes disabled
+by the suspension; manual disables remain in place:
+
+```bash
+pnpm user:suspend owner@example.com
+pnpm user:suspend https://example.com/s/your-hash
+pnpm user:unsuspend owner@example.com
+```
+
+Like the QR scripts, they run in the `migrate` service with Docker Compose.
+The sign-in error points the owner to `SUPPORT_EMAIL`; signed-in sessions end
+within 30 seconds. Running app instances may keep serving a cached redirect for
+up to 60 seconds.
+
 ## Legal pages
 
 `/terms-of-use` and `/privacy-policy` are public and linked from the footer,
@@ -197,12 +215,14 @@ to your jurisdiction and providers, before running a public instance.
 | `pnpm format`        | Format the codebase with Prettier.                |
 | `pnpm qr:disable`    | Disable a QR code by hand (see [Unsafe destinations](#unsafe-destinations)). |
 | `pnpm qr:enable`     | Lift a manual disable.                            |
+| `pnpm user:suspend`  | Suspend an account (see [Account suspension](#account-suspension)). |
+| `pnpm user:unsuspend` | Lift a suspension. |
 
 ## Project structure
 
 ```
 prisma/               Schema, migrations, seed script, generated Prisma client
-scripts/              Operator scripts (disabling QR codes)
+scripts/              Operator scripts (QR moderation and account suspension)
 src/app/               Routes (App Router)
 src/actions/           Server Actions
 src/schemas/           Zod validation schemas

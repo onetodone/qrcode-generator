@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { AuthError } from 'next-auth'
 import {
   clearLoginAttempts,
+  AccountSuspendedSignin,
   ConfirmationEmailFailedSignin,
   EmailNotVerifiedSignin,
   RateLimitedSignin,
@@ -30,6 +31,7 @@ import { getClientIp } from '@/lib/request'
 import { firstZodError, type FormState } from '@/lib/forms'
 import { hashPassword } from '@/lib/password'
 import { logger } from '@/lib/logger'
+import { accountSuspendedMessage } from '@/lib/auth-guard'
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 const ONE_HOUR_MS = 60 * 60 * 1000
@@ -61,6 +63,9 @@ export async function loginAction(_prevState: FormState, formData: FormData): Pr
     if (error instanceof EmailNotVerifiedSignin) {
       await storeHandoffCookie('pendingEmail', parsed.data.email)
       redirect('/verify-email')
+    }
+    if (error instanceof AccountSuspendedSignin) {
+      return { error: accountSuspendedMessage() }
     }
     if (error instanceof ConfirmationEmailFailedSignin) {
       return { error: CONFIRMATION_EMAIL_FAILED }

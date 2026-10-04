@@ -8,15 +8,16 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  pendingEmail  String?
-  image         String?
-  password      String?
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  emailVerified     DateTime?
+  pendingEmail      String?
+  image             String?
+  password          String?
   passwordChangedAt DateTime?
   termsAcceptedAt   DateTime?
+  suspendedAt       DateTime?
 
   accounts Account[]
   qrCodes  QrCode[]
@@ -69,24 +70,25 @@ enum QrShape {
 enum QrDisabledReason {
   UNSAFE_DESTINATION
   MANUAL
+  ACCOUNT_SUSPENDED
 }
 
 model QrCode {
-  id        String   @id @default(cuid())
-  userId    String
-  urlHash   String   @unique @db.VarChar(32)
-  note      String
-  leadsTo   String
-  shape     QrShape  @default(SQUARE)
-  fgColor   String   @default("#000000")
-  bgColor   String   @default("#ffffff")
-  views     Int      @default(0)
+  id                   String            @id @default(cuid())
+  userId               String
+  urlHash              String            @unique @db.VarChar(32)
+  note                 String
+  leadsTo              String
+  shape                QrShape           @default(SQUARE)
+  fgColor              String            @default("#000000")
+  bgColor              String            @default("#ffffff")
+  views                Int               @default(0)
   destinationSetAt     DateTime          @default(now())
   destinationCheckedAt DateTime?
   disabledAt           DateTime?
   disabledReason       QrDisabledReason?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
