@@ -13,7 +13,7 @@ import {
   normalizeLeadsTo,
 } from '@/lib/qrcode'
 import { firstZodError, type FormState } from '@/lib/forms'
-import { getSessionUserId } from '@/lib/auth-guard'
+import { accountSuspendedMessage, getSessionUserId } from '@/lib/auth-guard'
 import { invalidateRedirect } from '@/lib/redirect-cache'
 import { getAppHostnames } from '@/lib/request'
 import { rateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
@@ -27,12 +27,11 @@ const DAILY_CREATE_LIMIT = 10
 const SAVE_RATE_LIMIT = { limit: 30, windowMs: HOUR_MS }
 
 const NOT_SIGNED_IN = 'You must be signed in.'
-const ACCOUNT_SUSPENDED = 'This account has been suspended. Contact support.'
 const UNSAFE_DESTINATION = 'This destination is flagged as unsafe, so it can’t be used.'
 
 async function isAccountSuspended(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { suspendedAt: true } })
-  return user?.suspendedAt !== null && user?.suspendedAt !== undefined
+  return Boolean(user?.suspendedAt)
 }
 
 function isRecordNotFound(error: unknown): boolean {
@@ -97,7 +96,7 @@ async function dailyCreateLimitError(userId: string): Promise<string | null> {
 export async function createQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
-  if (await isAccountSuspended(userId)) return { error: ACCOUNT_SUSPENDED }
+  if (await isAccountSuspended(userId)) return { error: accountSuspendedMessage() }
 
   const rateLimitError = saveRateLimitError(userId)
   if (rateLimitError) return { error: rateLimitError }
@@ -142,7 +141,7 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
 export async function updateQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
-  if (await isAccountSuspended(userId)) return { error: ACCOUNT_SUSPENDED }
+  if (await isAccountSuspended(userId)) return { error: accountSuspendedMessage() }
 
   const id = formData.get('id')
   if (typeof id !== 'string' || !id) {

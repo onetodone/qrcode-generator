@@ -47,6 +47,16 @@ export function clearLoginAttempts(email: string): void {
   clearRateLimit(loginEmailKey(email))
 }
 
+/** `passwordChangedAt` in ms, or `null` when the account is gone or suspended, so its sessions end. */
+async function activePasswordChangedAtMs(userId: string): Promise<number | null> {
+  const record = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordChangedAt: true, suspendedAt: true },
+  })
+  if (!record || record.suspendedAt) return null
+  return record.passwordChangedAt?.getTime() ?? 0
+}
+
 const SESSION_REVALIDATE_MS = 30_000
 
 /** Deletes the token. False when it was already gone, so a token works once even under concurrent requests. */
@@ -180,12 +190,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         // Just verified in `authorize()` moments ago — no need to re-check.
         const userId = user.id as string
         token.id = userId
-        const securityState = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { passwordChangedAt: true, suspendedAt: true },
-        })
-        if (!securityState || securityState.suspendedAt) return null
-        token.passwordChangedAt = securityState.passwordChangedAt?.getTime() ?? 0
+        const changedAt = await activePasswordChangedAtMs(userId)
+        if (changedAt === null) return null
+        token.passwordChangedAt = changedAt
         token.checkedAt = Date.now()
         return token
       }
@@ -213,12 +220,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       const checkedAt = typeof token.checkedAt === 'number' ? token.checkedAt : 0
       if (Date.now() - checkedAt < SESSION_REVALIDATE_MS) return token
 
-      const record = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { passwordChangedAt: true, suspendedAt: true },
-      })
-      if (!record || record.suspendedAt) return null
-      if ((record.passwordChangedAt?.getTime() ?? 0) > issuedFor) return null
+      const changedAt = await activePasswordChangedAtMs(userId)
+      if (changedAt === null) return null
+      if (changedAt > issuedFor) return null
       token.checkedAt = Date.now()
 
       return token

@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 const SUMMARIES: Record<QrDisabledReason, string> = {
   UNSAFE_DESTINATION: 'Google Safe Browsing flagged the destination as unsafe.',
   MANUAL: 'The operator of this service disabled it for breaking the rules.',
-  ACCOUNT_SUSPENDED: 'This code is disabled because its owner account has been suspended.',
+  ACCOUNT_SUSPENDED: 'The operator of this service suspended the account that owns it.',
 }
 
 const NEXT_STEPS: Record<QrDisabledReason, string> = {

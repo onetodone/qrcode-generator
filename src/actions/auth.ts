@@ -31,7 +31,7 @@ import { getClientIp } from '@/lib/request'
 import { firstZodError, type FormState } from '@/lib/forms'
 import { hashPassword } from '@/lib/password'
 import { logger } from '@/lib/logger'
-import { getSupportEmail } from '@/lib/email/config'
+import { accountSuspendedMessage } from '@/lib/auth-guard'
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 const ONE_HOUR_MS = 60 * 60 * 1000
@@ -65,7 +65,7 @@ export async function loginAction(_prevState: FormState, formData: FormData): Pr
       redirect('/verify-email')
     }
     if (error instanceof AccountSuspendedSignin) {
-      return { error: `This account has been suspended. Contact ${getSupportEmail()}.` }
+      return { error: accountSuspendedMessage() }
     }
     if (error instanceof ConfirmationEmailFailedSignin) {
       return { error: CONFIRMATION_EMAIL_FAILED }

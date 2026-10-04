@@ -1,19 +1,11 @@
-import 'dotenv/config'
-import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient, QrDisabledReason } from '../prisma/generated/client'
+import { QrDisabledReason } from '../prisma/generated/client'
+import { hashFromInput, prisma, runOperatorScript } from './operator'
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
-const prisma = new PrismaClient({ adapter })
+// Suspends an account that breaks the Terms of Use, or lifts the suspension.
 
-function hashFromInput(input: string): string {
-  try {
-    const match = new URL(input).pathname.match(/^\/s\/([^/]+)/)
-    if (match?.[1]) return match[1]
-  } catch {
-    // An email or bare hash is handled below.
-  }
-  return input
-}
+const USAGE = `Usage:
+  pnpm user:suspend <email|hash|link>     Suspend the account and disable its enabled codes
+  pnpm user:unsuspend <email|hash|link>   Lift the suspension and the disables it caused`
 
 async function findUser(target: string) {
   if (target.includes('@') && !target.includes('/')) {
@@ -30,7 +22,7 @@ async function findUser(target: string) {
 async function main() {
   const [command, target] = process.argv.slice(2)
   if ((command !== 'suspend' && command !== 'unsuspend') || !target) {
-    console.error('Usage: pnpm user:suspend <email|hash|link> | pnpm user:unsuspend <email|hash|link>')
+    console.error(USAGE)
     process.exitCode = 1
     return
   }
@@ -42,7 +34,7 @@ async function main() {
     return
   }
 
-  const count = await prisma.$transaction(async (tx) => {
+  const { count } = await prisma.$transaction(async (tx) => {
     if (command === 'suspend') {
       await tx.user.update({ where: { id: user.id }, data: { suspendedAt: new Date() } })
       return tx.qrCode.updateMany({
@@ -58,17 +50,8 @@ async function main() {
     })
   })
 
-  console.log(
-    `${command === 'suspend' ? 'Suspended' : 'Unsuspended'} ${user.email}; updated ${count.count} QR code(s).`,
-  )
+  console.log(`${command === 'suspend' ? 'Suspended' : 'Unsuspended'} ${user.email}; updated ${count} QR code(s).`)
   console.log('Running app instances may serve cached redirects for up to 60 s.')
 }
 
-main()
-  .catch((error) => {
-    console.error(error)
-    process.exitCode = 1
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+runOperatorScript(main)

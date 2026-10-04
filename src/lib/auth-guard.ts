@@ -1,6 +1,12 @@
 import type { Session } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
+import { getSupportEmail } from '@/lib/email/config'
+
+/** Error shown to a suspended account on sign-in and in Server Actions. */
+export function accountSuspendedMessage(): string {
+  return `This account has been suspended. Contact ${getSupportEmail()}.`
+}
 
 /**
  * The signed-in user's id, or `null`. For Server Actions, which report an
