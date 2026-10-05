@@ -291,7 +291,8 @@ export async function forgotPasswordAction(_prevState: FormState, formData: Form
 /**
  * Sets a new password from a reset token, revokes every existing session of
  * the account, lifts its failed sign-in limit and confirms its email if it
- * wasn't yet. Signs this browser out rather than in. Rate-limited per IP.
+ * wasn't yet. Signs this browser out rather than in and redirects to
+ * `/password-updated`. Rate-limited per IP.
  */
 export async function resetPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const reset = rateLimit(`reset-password:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
@@ -339,5 +340,5 @@ export async function resetPasswordAction(_prevState: FormState, formData: FormD
   // The new password ends every session; this browser signs in with it too.
   if (await auth()) await signOut({ redirect: false })
 
-  return { success: true }
+  redirect('/password-updated')
 }
