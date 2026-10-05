@@ -13,6 +13,7 @@ const publicRoutes = [
   '/link-disabled',
   '/confirm-email',
   '/reset-password',
+  '/password-updated',
   '/terms-of-use',
   '/privacy-policy',
   '/account-deleted',

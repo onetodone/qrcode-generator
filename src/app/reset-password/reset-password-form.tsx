@@ -1,7 +1,6 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import Link from 'next/link'
 import { resetPasswordAction } from '@/actions/auth'
 import type { FormState } from '@/lib/forms'
 import { Button } from '@/components/ui/button'
@@ -13,22 +12,6 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [state, action, pending] = useActionState<FormState, FormData>(resetPasswordAction, undefined)
-
-  if (state?.success) {
-    return (
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Password updated</CardTitle>
-          <CardDescription>Your password has been changed. Sign in with your new password.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button className="w-full" nativeButton={false} render={<Link href="/login" />}>
-            Back to sign in
-          </Button>
-        </CardContent>
-      </Card>
-    )
-  }
 
   return (
     <Card className="w-full max-w-sm">
