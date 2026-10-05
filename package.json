@@ -1,6 +1,6 @@
 {
   "name": "qrcode-generator",
-  "version": "5.4.3",
+  "version": "5.5.0",
   "description": "QR code generator with scan tracking — create QR codes, redirect scans through a short link, and see view counts per code.",
   "private": true,
   "author": "Anton Holubeu (https://github.com/aholu)",
@@ -24,7 +24,7 @@
   "scripts": {
     "dev": "dotenv run -q -f .env -- next dev",
     "build": "next build",
-    "start": "dotenv run -q -f .env -- next start",
+    "start": "dotenv run -q -f .env -- node --import ./trusted-proxy.mjs node_modules/next/dist/bin/next start",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx}\"",
     "lint": "eslint . --fix",

@@ -128,6 +128,16 @@ mail server reachable from the container (`localhost` inside the container is
 the container itself). Set `APP_URL` to the address users open the app at —
 links in outgoing email are built from it.
 
+Logs and rate limits key on the client IP. The server takes it from
+`X-Forwarded-For` only when the request comes from a trusted peer, a reverse
+proxy that appends the client address (nginx with
+`$proxy_add_x_forwarded_for`, Caddy, Traefik). Any other request gets its
+socket address, so a client can't pick its own IP by sending the header.
+`TRUSTED_PROXY` sets which peers are trusted: `private` (default) for loopback
+and private networks, `all` for a proxy on a public address such as a CDN in
+front of the origin, `none` for no proxy. Vercel sets the header itself and
+ignores the variable.
+
 ## Sign-in providers
 
 Besides email and password, users can sign up and sign in through third-party
@@ -188,8 +198,9 @@ With `SAFE_BROWSING_API_KEY` set, every web destination is looked up in
 - **After scans** — a scan re-checks the destination in the background once
   it is due: hourly during the first week after the destination was set, daily
   after that. A flagged code is disabled: its `/s/[hash]` link opens
-  `/link-disabled` instead of the destination and scans aren't counted. Saving
-  the code with a safe destination enables it again.
+  `/link-disabled` instead of the destination and scans aren't counted, and
+  the owner gets an email naming the code, the reason and a link to change the
+  destination. Saving the code with a safe destination enables it again.
 
 With or without a key, a destination is rejected on save when it carries a
 username or password (`https://bank.example@evil.example`), is another code's
@@ -213,8 +224,11 @@ pnpm qr:disable <hash> --owner                        # every code of the same o
 pnpm qr:enable <hash>                                 # lift a manual disable
 ```
 
-The scripts use `DATABASE_URL` from the environment, falling back to `.env`.
-With Docker Compose, run them in the `migrate` service:
+`qr:disable` emails the owner which codes it disabled and why. The scripts use
+`DATABASE_URL`, `APP_URL`, `SUPPORT_EMAIL` and the `SMTP_*` settings from the
+environment, falling back to `.env`; when the email fails, the disable stays in
+place and the script exits with an error. With Docker Compose, run them in the
+`migrate` service:
 `docker compose run --rm migrate pnpm qr:disable <hash>`. Running app instances
 may keep serving a cached redirect for up to 60 seconds.
 
@@ -222,8 +236,9 @@ may keep serving a cached redirect for up to 60 seconds.
 
 An account that breaks the Terms of Use can be suspended by email address, QR
 hash or short link. Its enabled codes stop redirecting, and it can no longer
-sign in, create codes or edit them. Unsuspending restores the codes disabled
-by the suspension; manual disables remain in place:
+sign in, create codes or edit them, and the owner gets an email listing the
+codes the suspension disabled. Unsuspending restores those codes; manual
+disables remain in place:
 
 ```bash
 pnpm user:suspend owner@example.com

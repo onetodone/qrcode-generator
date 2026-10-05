@@ -15,7 +15,8 @@ services:
       retries: 10
 
   # One-shot: applies pending migrations, then exits. `app` waits for it to
-  # finish successfully before starting.
+  # finish successfully before starting. Also runs the operator scripts, which
+  # email owners about disabled codes, hence the mail settings.
   migrate:
     build:
       context: .
@@ -23,6 +24,16 @@ services:
     command: pnpm exec prisma migrate deploy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-qrcode_generator}?schema=public
+      APP_URL: ${APP_URL:-http://localhost:${PORT:-3000}}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_REQUIRE_TLS: ${SMTP_REQUIRE_TLS:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,6 +65,7 @@ services:
       GATAG_ID: ${GATAG_ID:-}
       SAFE_BROWSING_API_KEY: ${SAFE_BROWSING_API_KEY:-}
       CSP_CONNECT_SRC_EXTRA: ${CSP_CONNECT_SRC_EXTRA:-}
+      TRUSTED_PROXY: ${TRUSTED_PROXY:-private}
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
       AUTH_GITHUB_ID: ${AUTH_GITHUB_ID:-}
