@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { connection } from 'next/server'
 import { getLegalInfo } from '@/lib/legal'
+import { enabledOAuthProviders } from '@/lib/oauth-providers'
 import { EmailLink, LegalPage, UNNAMED_OPERATOR } from '@/components/legal-page'
 
 export const metadata: Metadata = {
@@ -13,6 +14,8 @@ export default async function PrivacyPolicyPage() {
   await connection()
   const { operatorName, supportEmail, analytics, safeBrowsing, vercel } = getLegalInfo()
   const support = <EmailLink email={supportEmail} />
+  const signInProviders = enabledOAuthProviders().map((provider) => provider.name)
+  const providerList = new Intl.ListFormat('en', { type: 'disjunction' }).format(signInProviders)
 
   return (
     <LegalPage title="Privacy Policy">
@@ -34,6 +37,13 @@ export default async function PrivacyPolicyPage() {
       <ul>
         <li>Your name and email address, and a new address while you confirm a change of email.</li>
         <li>Your password, stored only as a bcrypt hash. We can’t read your password.</li>
+        {signInProviders.length > 0 && (
+          <li>
+            If you sign in with {providerList}: the identifier of your account there, linked to your account here, and
+            the name and verified email address it shares with us. We don’t keep the provider’s access tokens or your
+            profile picture.
+          </li>
+        )}
         <li>
           When your account was created, when you confirmed your email address, when you last changed your password,
           when you agreed to the Terms of Use, and when your account was suspended, if it was.
@@ -169,6 +179,11 @@ export default async function PrivacyPolicyPage() {
         <li>our database provider, which stores account and QR code data;</li>
         <li>our email provider, which delivers account emails;</li>
         {(analytics || safeBrowsing) && <li>Google, as described above.</li>}
+        {signInProviders.length > 0 && (
+          <li>
+            the sign-in provider you choose ({providerList}), which confirms who you are under its own privacy policy;
+          </li>
+        )}
       </ul>
       <p>
         We may also disclose data where the law requires it, to answer valid legal requests, or to protect the rights,

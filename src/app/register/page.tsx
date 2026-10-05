@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
 import { AuthLayout } from '@/components/auth-card'
+import { oauthProviderOptions } from '@/lib/oauth-providers'
 import { RegisterForm } from './register-form'
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export default async function RegisterPage() {
 
   return (
     <AuthLayout>
-      <RegisterForm />
+      <RegisterForm providers={oauthProviderOptions()} />
     </AuthLayout>
   )
 }

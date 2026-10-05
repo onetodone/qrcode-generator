@@ -2,7 +2,7 @@ import { createMailer } from '@onetodone/mailer'
 import { smtpTransport } from '@onetodone/mailer/smtp'
 import { logger } from '@/lib/logger'
 import { getAppUrl, getSender, getSmtpOptions, getSupportEmail } from './config'
-import { accountExists } from './templates'
+import { accountExists, providerConnected } from './templates'
 
 function createAppMailer() {
   const appUrl = getAppUrl()
@@ -20,7 +20,7 @@ function createAppMailer() {
       footerText: 'This is an automated message, please do not reply.',
       theme: { primary: '#111827', background: '#f3f4f6', text: '#111827', mutedText: '#6b7280' },
     },
-    templates: { accountExists },
+    templates: { accountExists, providerConnected },
     onSent: ({ template, result, durationMs }) => {
       logger.info('email.sent', { template, messageId: result.messageId, durationMs })
     },

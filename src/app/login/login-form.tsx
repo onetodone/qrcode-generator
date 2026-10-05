@@ -4,12 +4,20 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { loginAction } from '@/actions/auth'
 import type { FormState } from '@/lib/forms'
+import type { OAuthProviderOption } from '@/lib/oauth-providers'
+import { OAuthButtons } from '@/components/oauth-buttons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-export function LoginForm() {
+export function LoginForm({
+  providers,
+  providerError,
+}: {
+  providers: OAuthProviderOption[]
+  providerError: string | null
+}) {
   // Controlled so a validation error doesn't wipe the fields — React resets
   // uncontrolled fields after any Server Action completes, error or not.
   const [email, setEmail] = useState('')
@@ -23,6 +31,7 @@ export function LoginForm() {
         <CardDescription>Access your QR codes dashboard.</CardDescription>
       </CardHeader>
       <CardContent>
+        <OAuthButtons providers={providers} error={providerError} />
         <form action={action}>
           <FieldGroup>
             <Field>

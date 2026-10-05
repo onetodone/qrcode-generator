@@ -1,10 +1,12 @@
-import NextAuth, { CredentialsSignin, type User } from 'next-auth'
+import NextAuth, { AuthError, CredentialsSignin, type Account, type Profile, type User } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
+import { decode } from 'next-auth/jwt'
+import { cookies } from 'next/headers'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import { Prisma, VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
-import { sendEmailChangedNotice } from '@/lib/account-emails'
+import { sendEmailChangedNotice, sendProviderConnectedNotice } from '@/lib/account-emails'
 import { afterResponse } from '@/lib/after-response'
 import { loginSchema } from '@/schemas/auth'
 import { passwordField } from '@/schemas/password'
@@ -12,6 +14,7 @@ import { hashPassword, verifyPasswordConstantTime } from '@/lib/password'
 import { clearRateLimit, rateLimit, refundRateLimit } from '@/lib/rate-limit'
 import { clientIpFromHeaders } from '@/lib/request'
 import { logger } from '@/lib/logger'
+import { enabledOAuthProviders, findOAuthProvider, oauthProviderName, ProviderSignInError } from '@/lib/oauth-providers'
 
 export class EmailNotVerifiedSignin extends CredentialsSignin {
   code = 'email_not_verified'
@@ -58,6 +61,113 @@ async function activePasswordChangedAtMs(userId: string): Promise<number | null>
 }
 
 const SESSION_REVALIDATE_MS = 30_000
+
+// Rejections a user can cause on their own: cancelled consent, an address
+// that belongs to another account, a provider account without a verified email.
+const EXPECTED_SIGN_IN_ERRORS = new Set(['AccessDenied', 'OAuthAccountNotLinked', 'OAuthCallbackError'])
+
+function signInErrorUrl(code: string): string {
+  return `/login?error=${code}`
+}
+
+const RECENT_SIGN_IN_MS = 10 * 60 * 1000
+
+const SESSION_COOKIE = /^((?:__Secure-)?authjs\.session-token)(?:\.(\d+))?$/
+
+/**
+ * The request's session cookie, checked against the database now rather than
+ * through the `jwt` callback, which trusts a session for up to 30 s: `none`
+ * without one, `revoked` when it no longer counts, otherwise `recent` or
+ * `stale` depending on whether its sign-in was within the last 10 minutes.
+ * Connecting a provider and deleting an account without a password need a
+ * `recent` one, so a stolen session can't turn into lasting access.
+ */
+export async function sessionCookieState(): Promise<'none' | 'revoked' | 'stale' | 'recent'> {
+  const chunks: { name: string; index: number; value: string }[] = []
+  for (const cookie of (await cookies()).getAll()) {
+    const match = SESSION_COOKIE.exec(cookie.name)
+    if (match?.[1]) chunks.push({ name: match[1], index: Number(match[2] ?? 0), value: cookie.value })
+  }
+  const salt = chunks[0]?.name
+  if (!salt) return 'none'
+
+  const value = chunks
+    .filter((chunk) => chunk.name === salt)
+    .sort((a, b) => a.index - b.index)
+    .map((chunk) => chunk.value)
+    .join('')
+
+  let token
+  try {
+    token = await decode({ token: value, secret: process.env.AUTH_SECRET ?? '', salt })
+  } catch {
+    return 'revoked'
+  }
+  if (!token || typeof token.id !== 'string') return 'revoked'
+
+  const changedAt = await activePasswordChangedAtMs(token.id)
+  const issuedFor = typeof token.passwordChangedAt === 'number' ? token.passwordChangedAt : 0
+  if (changedAt === null || changedAt > issuedFor) return 'revoked'
+
+  const signedInAt = typeof token.signedInAt === 'number' ? token.signedInAt : 0
+  return Date.now() - signedInAt < RECENT_SIGN_IN_MS ? 'recent' : 'stale'
+}
+
+/**
+ * Decides a sign-in through a third-party provider. A known provider account
+ * signs in unless its user is suspended. A new one is linked to the signed-in
+ * user when the session is recent; Auth.js links to any session cookie it can
+ * decode, so a revoked or old one is refused first. Without a session, it
+ * needs an email address the provider has verified and creates an account;
+ * an address that already has an account is refused by Auth.js unless that
+ * account was never confirmed.
+ */
+async function authorizeProviderSignIn(
+  user: User,
+  account: Account,
+  profile: Profile | undefined,
+): Promise<boolean | string> {
+  const linked = await prisma.account.findUnique({
+    where: { provider_providerAccountId: { provider: account.provider, providerAccountId: account.providerAccountId } },
+    select: { user: { select: { suspendedAt: true } } },
+  })
+  if (linked) {
+    return linked.user.suspendedAt ? signInErrorUrl(ProviderSignInError.AccountSuspended) : true
+  }
+
+  switch (await sessionCookieState()) {
+    case 'revoked':
+      return signInErrorUrl(ProviderSignInError.SessionExpired)
+    case 'stale':
+      return signInErrorUrl(ProviderSignInError.ReauthRequired)
+    case 'recent':
+      return true
+  }
+
+  const provider = findOAuthProvider(account.provider)
+  if (!provider || !profile || !user.email || !provider.hasVerifiedEmail(profile)) {
+    return signInErrorUrl(ProviderSignInError.EmailNotVerified)
+  }
+
+  // Auth.js looks the address up exactly; this object is the one it then
+  // uses, so an existing account in any letter case is found.
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: user.email, mode: 'insensitive' } },
+    select: { email: true },
+  })
+  user.email = existing?.email ?? user.email.toLowerCase()
+
+  // A registration nobody confirmed only holds the address; the provider has
+  // just shown that it belongs to this user.
+  const email = user.email
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.user.deleteMany({
+      where: { email, emailVerified: null, accounts: { none: {} }, qrCodes: { none: {} } },
+    })
+    if (count > 0) await tx.verificationToken.deleteMany({ where: { identifier: email } })
+  })
+  return true
+}
 
 /** Deletes the token. False when it was already gone, so a token works once even under concurrent requests. */
 async function consumeToken(token: string): Promise<boolean> {
@@ -125,11 +235,15 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   adapter: PrismaAdapter(prisma),
   // Credentials-based auth only supports JWT sessions, not database sessions.
   session: { strategy: 'jwt' },
-  pages: { signIn: '/login' },
+  pages: { signIn: '/login', error: '/login' },
   trustHost: true,
   logger: {
     error(error) {
       if (error instanceof CredentialsSignin) return
+      if (error instanceof AuthError && EXPECTED_SIGN_IN_ERRORS.has(error.type)) {
+        logger.warn('auth.sign_in_rejected', { error })
+        return
+      }
       logger.error('auth.error', { error })
     },
   },
@@ -183,17 +297,43 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         return { id: user.id, email: user.email, name: user.name }
       },
     }),
+    ...enabledOAuthProviders().map((provider) => provider.create()),
   ],
+  events: {
+    // Only provider sign-ins create users through the adapter, after the
+    // `signIn` callback has checked the address. Continuing past the terms
+    // notice next to the provider buttons accepts them.
+    async createUser({ user }) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: new Date(), termsAcceptedAt: new Date(), image: null },
+      })
+    },
+    // A new user arrives here straight from `createUser`, still without
+    // `emailVerified` on this object; only links to existing accounts notify.
+    async linkAccount({ user, account }) {
+      if (!('emailVerified' in user) || !user.emailVerified || !user.email) return
+      const recipient = { email: user.email, name: user.name ?? null }
+      afterResponse('auth.provider_connected_notice_failed', () =>
+        sendProviderConnectedNotice(recipient, oauthProviderName(account.provider)),
+      )
+    },
+  },
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (!account || account.type === 'credentials') return true
+      return authorizeProviderSignIn(user, account, profile)
+    },
     async jwt({ token, user, trigger }) {
       if (user) {
-        // Just verified in `authorize()` moments ago — no need to re-check.
+        // Just signed in; the checks below start from the database state.
         const userId = user.id as string
         token.id = userId
         const changedAt = await activePasswordChangedAtMs(userId)
         if (changedAt === null) return null
         token.passwordChangedAt = changedAt
         token.checkedAt = Date.now()
+        token.signedInAt = Date.now()
         return token
       }
 
