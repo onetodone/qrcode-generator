@@ -4,13 +4,15 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { registerAction } from '@/actions/auth'
 import type { FormState } from '@/lib/forms'
+import type { OAuthProviderOption } from '@/lib/oauth-providers'
+import { OAuthButtons } from '@/components/oauth-buttons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-export function RegisterForm() {
+export function RegisterForm({ providers }: { providers: OAuthProviderOption[] }) {
   // Controlled so a validation error doesn't wipe the fields — React resets
   // uncontrolled fields after any Server Action completes, error or not.
   const [name, setName] = useState('')
@@ -28,6 +30,7 @@ export function RegisterForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <OAuthButtons providers={providers} />
         <form action={action}>
           <FieldGroup>
             <Field>

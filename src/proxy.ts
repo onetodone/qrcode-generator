@@ -3,13 +3,27 @@ import { auth } from '@/auth'
 import { logRequest } from '@/lib/logger'
 import { setHandoffCookie } from '@/lib/handoff-cookies'
 import { clientIpFromHeaders } from '@/lib/request'
+import { enabledOAuthProviders } from '@/lib/oauth-providers'
 
-const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password']
-// Open to guests and signed-in users alike; matched exactly.
-const publicRoutes = ['/', '/link-disabled', '/confirm-email', '/terms-of-use', '/privacy-policy', '/account-deleted']
+const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password']
+// Open to guests and signed-in users alike; matched exactly. A signed-in
+// account without a password sets one through `/reset-password`.
+const publicRoutes = [
+  '/',
+  '/link-disabled',
+  '/confirm-email',
+  '/reset-password',
+  '/terms-of-use',
+  '/privacy-policy',
+  '/account-deleted',
+]
 
 const isDev = process.env.NODE_ENV !== 'production'
 const cspConnectSrcExtra = process.env.CSP_CONNECT_SRC_EXTRA?.trim() ?? ''
+// A sign-in form submitted without JavaScript is redirected to the provider.
+const cspFormActionExtra = enabledOAuthProviders()
+  .map((provider) => ` ${provider.authorizeOrigin}`)
+  .join('')
 
 function buildCsp(nonce: string): string {
   return [
@@ -17,7 +31,7 @@ function buildCsp(nonce: string): string {
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
-    "form-action 'self'",
+    `form-action 'self'${cspFormActionExtra}`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
@@ -46,7 +60,11 @@ export default auth((req) => {
   if (!isLoggedIn && !isPublicOnlyRoute && !isPublicRoute) {
     response = NextResponse.redirect(new URL('/login', nextUrl))
   } else if (isLoggedIn && isPublicOnlyRoute) {
-    response = NextResponse.redirect(new URL('/qrcodes', nextUrl))
+    // A failed attempt to connect a provider ends on the sign-in error page.
+    const signInError = nextUrl.pathname === '/login' ? nextUrl.searchParams.get('error') : null
+    const target = new URL(signInError ? '/profile' : '/qrcodes', nextUrl)
+    if (signInError) target.searchParams.set('error', signInError)
+    response = NextResponse.redirect(target)
   } else if (resetToken) {
     response = NextResponse.redirect(new URL('/reset-password', nextUrl))
     setHandoffCookie(response, 'resetToken', resetToken, req.headers)

@@ -49,3 +49,15 @@ export async function sendEmailChangedNotice(previous: AccountRecipient, newEmai
     props: { userName: previous.name ?? undefined, newEmail, changedAt: new Date(), ip: knownIp(ip) },
   })
 }
+
+/**
+ * Tells the account's owner that sign-in through `providerName` was connected
+ * to the account. Throws when the email can't be sent.
+ */
+export async function sendProviderConnectedNotice(account: AccountRecipient, providerName: string): Promise<void> {
+  const appUrl = getAppUrl()
+  await getMailer().send('providerConnected', {
+    to: account.email,
+    props: { userName: account.name ?? undefined, providerName, profileUrl: `${appUrl}/profile` },
+  })
+}

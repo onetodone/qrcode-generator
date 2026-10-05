@@ -56,8 +56,9 @@ export default async function TermsOfUsePage() {
       <ul>
         <li>Register with an email address that belongs to you and that you can read.</li>
         <li>
-          Keep your password secret. You are responsible for everything done with your account. If you think someone
-          else has access to it, change your password and tell us at {support}.
+          Keep your password, and the accounts you sign in with through a provider, secure. You are responsible for
+          everything done with your account. If you think someone else has access to it, change your password and tell
+          us at {support}.
         </li>
         <li>
           You can delete your account at any time in your profile. This deletes your QR codes too, and their links stop

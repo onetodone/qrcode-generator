@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { AuthError } from 'next-auth'
-import { signIn, signOut, unstable_update } from '@/auth'
+import { sessionCookieState, signIn, signOut, unstable_update } from '@/auth'
+import { Prisma } from '@/generated/client'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
@@ -16,6 +17,8 @@ import { getClientIp } from '@/lib/request'
 import { getSessionUserId } from '@/lib/auth-guard'
 import { invalidateRedirect } from '@/lib/redirect-cache'
 import { logger } from '@/lib/logger'
+import { oauthProviderName } from '@/lib/oauth-providers'
+import { RECENT_SIGN_IN_REQUIRED } from '@/lib/sign-in-errors'
 
 const NOT_SIGNED_IN = 'You must be signed in.'
 
@@ -75,6 +78,9 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
 
   let noticeDue = false
   if (newEmailRequested) {
+    if (!currentUser.password) {
+      return { error: 'Set a password before changing your email.' }
+    }
     if (!parsed.data.currentPassword) {
       return { error: 'Enter your current password to change your email.' }
     }
@@ -181,7 +187,9 @@ export async function changePasswordAction(_prevState: FormState, formData: Form
 }
 
 /**
- * Deletes the signed-in user's account after checking the current password.
+ * Deletes the signed-in user's account after checking the current password,
+ * or, for an account without one, its email address typed in again and a
+ * sign-in from the last 10 minutes.
  * Its QR codes go with it, so their links return 404, and so do pending
  * confirmation and reset links. Signs out and redirects to `/account-deleted`.
  * Other sessions of the account end at their next check.
@@ -190,7 +198,10 @@ export async function deleteAccountAction(_prevState: FormState, formData: FormD
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
 
-  const parsed = deleteAccountSchema.safeParse({ currentPassword: formData.get('currentPassword') })
+  const parsed = deleteAccountSchema.safeParse({
+    currentPassword: formData.get('currentPassword') ?? undefined,
+    confirmEmail: formData.get('confirmEmail') ?? undefined,
+  })
   if (!parsed.success) {
     return { error: firstZodError(parsed.error) }
   }
@@ -201,8 +212,18 @@ export async function deleteAccountAction(_prevState: FormState, formData: FormD
   })
   if (!user) return { error: NOT_SIGNED_IN }
 
-  const passwordError = await checkCurrentPassword(userId, parsed.data.currentPassword, user.password)
-  if (passwordError) return { error: passwordError }
+  if (user.password) {
+    if (!parsed.data.currentPassword) {
+      return { error: 'Enter your current password to delete your account.' }
+    }
+    const passwordError = await checkCurrentPassword(userId, parsed.data.currentPassword, user.password)
+    if (passwordError) return { error: passwordError }
+  } else {
+    if (parsed.data.confirmEmail?.toLowerCase() !== user.email.toLowerCase()) {
+      return { error: 'Enter your email address to delete your account.' }
+    }
+    if ((await sessionCookieState()) !== 'recent') return { error: RECENT_SIGN_IN_REQUIRED }
+  }
 
   const identifiers = user.pendingEmail ? [user.email, user.pendingEmail] : [user.email]
   await prisma.$transaction([
@@ -216,4 +237,77 @@ export async function deleteAccountAction(_prevState: FormState, formData: FormD
 
   await signOut({ redirectTo: '/account-deleted' })
   return { success: true }
+}
+
+/**
+ * Emails the signed-in user a link to set a password, for an account that
+ * signs in only through providers. A session alone can't set one: with a
+ * password, the email address could be changed too. Setting it ends every
+ * session, as a password reset does.
+ */
+export async function sendSetPasswordLinkAction(): Promise<FormState> {
+  const userId = await getSessionUserId()
+  if (!userId) return { error: NOT_SIGNED_IN }
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, password: true } })
+  if (!user) return { error: NOT_SIGNED_IN }
+  if (user.password) return { error: 'Your account already has a password.' }
+
+  try {
+    const sent = await sendVerificationEmail(user.email, VerificationTokenType.PASSWORD_RESET)
+    if (!sent) return { error: 'A link was sent a moment ago. Check your inbox, or try again in a few minutes.' }
+  } catch (error) {
+    logger.error('profile.set_password_email_failed', { error })
+    return { error: "We couldn't send the email. Please try again in a few minutes." }
+  }
+  return { success: true }
+}
+
+/**
+ * Disconnects a provider from the signed-in user's account. Refused when it
+ * is the only way left to sign in.
+ */
+export async function disconnectProviderAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const userId = await getSessionUserId()
+  if (!userId) return { error: NOT_SIGNED_IN }
+
+  const provider = formData.get('provider')
+  if (typeof provider !== 'string') return { error: 'Invalid input.' }
+
+  let error: string | null
+  try {
+    error = await disconnectProvider(userId, provider)
+  } catch (cause) {
+    // A concurrent disconnect of the same account; serializable isolation
+    // keeps both from passing the last-method check.
+    if (cause instanceof Prisma.PrismaClientKnownRequestError && cause.code === 'P2034') {
+      return { error: 'Please try again.' }
+    }
+    throw cause
+  }
+  if (error) return { error }
+
+  logger.info('account.provider_disconnected', { userId, provider })
+  revalidatePath('/profile')
+  return { success: true }
+}
+
+/** Deletes the link; returns the error to show, or `null`. */
+async function disconnectProvider(userId: string, provider: string): Promise<string | null> {
+  return prisma.$transaction(
+    async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { password: true, accounts: { select: { provider: true } } },
+      })
+      if (!user) return NOT_SIGNED_IN
+      if (!user.accounts.some((account) => account.provider === provider)) return null
+      if (!user.password && user.accounts.length <= 1) {
+        return `${oauthProviderName(provider)} is the only way to sign in to your account. Set a password or connect another provider first.`
+      }
+      await tx.account.deleteMany({ where: { userId, provider } })
+      return null
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  )
 }

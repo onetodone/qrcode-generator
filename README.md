@@ -21,6 +21,9 @@ deployed.
   password authentication with email confirmation and password reset. The
   password is chosen when the email address is confirmed, and an email change
   needs the current password and is announced to the old address.
+- **Sign-in providers** — optional sign-up and sign-in with Google, GitHub,
+  Microsoft, Facebook, Discord, GitLab or LinkedIn; each one turns on when its
+  credentials are set. See [Sign-in providers](#sign-in-providers).
 - **Editable metadata** — update a code's destination, note, or design after
   creation without regenerating the QR image itself.
 - **Unsafe destination protection** — destinations are checked against
@@ -80,6 +83,7 @@ deployed.
    | `LEGAL_OPERATOR_NAME` / `LEGAL_JURISDICTION`                        | Operator named on the legal pages, and the jurisdiction whose law governs the Terms (both optional). See [Legal pages](#legal-pages). |
    | `GATAG_ID`                                                          | Google Analytics measurement ID (optional). Loads only after a visitor accepts analytics cookies; its origins must be added to `CSP_CONNECT_SRC_EXTRA`. |
    | `SAFE_BROWSING_API_KEY`                                             | Google Safe Browsing API key (optional). Empty turns destination checks off. See [Unsafe destinations](#unsafe-destinations). |
+   | `AUTH_<PROVIDER>_ID` / `AUTH_<PROVIDER>_SECRET`                     | OAuth client of a sign-in provider (optional). See [Sign-in providers](#sign-in-providers). |
 
 3. Apply database migrations:
 
@@ -123,6 +127,55 @@ Sign-in requires a confirmed email address, so Compose refuses to start without
 mail server reachable from the container (`localhost` inside the container is
 the container itself). Set `APP_URL` to the address users open the app at —
 links in outgoing email are built from it.
+
+## Sign-in providers
+
+Besides email and password, users can sign up and sign in through third-party
+providers. A provider is offered only when both of its variables are set; with
+none set, sign-in is email and password only.
+
+| Provider  | Variables                                                     | Register the app at                                         |
+| --------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
+| Google    | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`                        | Google Cloud Console → APIs & Services → Credentials        |
+| GitHub    | `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET`                        | GitHub → Settings → Developer settings → OAuth Apps         |
+| Microsoft | `AUTH_MICROSOFT_ENTRA_ID_ID`, `AUTH_MICROSOFT_ENTRA_ID_SECRET` | Microsoft Entra admin center → App registrations            |
+| Facebook  | `AUTH_FACEBOOK_ID`, `AUTH_FACEBOOK_SECRET`                    | Meta for Developers → My Apps                               |
+| Discord   | `AUTH_DISCORD_ID`, `AUTH_DISCORD_SECRET`                      | Discord Developer Portal → Applications → OAuth2            |
+| GitLab    | `AUTH_GITLAB_ID`, `AUTH_GITLAB_SECRET`                        | GitLab → Preferences → Applications (scope `read_user`)     |
+| LinkedIn  | `AUTH_LINKEDIN_ID`, `AUTH_LINKEDIN_SECRET`                    | LinkedIn Developers → My apps ("Sign In with LinkedIn using OpenID Connect") |
+
+The callback URL to register is `<APP_URL>/api/auth/callback/<provider>`, for
+example `https://example.com/api/auth/callback/google`; Microsoft's provider
+id is `microsoft-entra-id`. Register the Microsoft app for personal and
+work or school accounts; work accounts sign in only with the `xms_edov`
+optional claim configured, which marks their email address as verified.
+
+How it behaves:
+
+- A provider account with an email address the provider has verified creates
+  an account here on first sign-in, confirmed and with the Terms of Use
+  accepted (the buttons sit above that notice). A provider that shares no
+  verified address is refused. Facebook doesn't say whether an address is
+  verified, so it only signs in to accounts it was connected to.
+- When the address already belongs to an account, nothing is linked
+  automatically: the user signs in with the password and connects the
+  provider under **Profile → Connected accounts**. Email addresses are matched
+  regardless of letter case. An address that was registered but never
+  confirmed is released to the provider sign-in.
+- Connecting a provider needs a sign-in from the last 10 minutes, checked
+  against the database, and the account's address gets an email about it.
+- A connected provider can be disconnected unless it is the only way left to
+  sign in. An account without a password gets an emailed link to set one, and
+  confirms its deletion by typing its email address, also within 10 minutes
+  of signing in.
+- Suspended accounts can't sign in through a provider either. Provider access
+  tokens aren't stored.
+
+To add another provider supported by Auth.js, add an entry to
+`src/lib/oauth-providers.ts` (id, name, authorization origin, provider factory
+and the check that tells whether the profile's email is verified), optionally
+its mark in `src/components/provider-icons.tsx`, and its two variables to
+`.env.example` and `docker-compose.yml`.
 
 ## Unsafe destinations
 

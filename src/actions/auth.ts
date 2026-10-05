@@ -3,11 +3,13 @@
 import { redirect } from 'next/navigation'
 import { AuthError } from 'next-auth'
 import {
+  auth,
   clearLoginAttempts,
   AccountSuspendedSignin,
   ConfirmationEmailFailedSignin,
   EmailNotVerifiedSignin,
   RateLimitedSignin,
+  sessionCookieState,
   signIn,
   signOut,
   VerificationTokenInvalidSignin,
@@ -32,6 +34,8 @@ import { firstZodError, type FormState } from '@/lib/forms'
 import { hashPassword } from '@/lib/password'
 import { logger } from '@/lib/logger'
 import { accountSuspendedMessage } from '@/lib/auth-guard'
+import { findOAuthProvider } from '@/lib/oauth-providers'
+import { RECENT_SIGN_IN_REQUIRED } from '@/lib/sign-in-errors'
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 const ONE_HOUR_MS = 60 * 60 * 1000
@@ -78,6 +82,31 @@ export async function loginAction(_prevState: FormState, formData: FormData): Pr
     }
     throw error
   }
+}
+
+/**
+ * Starts a sign-in through the provider in the form's `provider` field and
+ * redirects to its consent page. Signed in, it connects the provider to the
+ * account and returns to `/profile`; that needs a sign-in from the last 10
+ * minutes. Rate-limited per IP.
+ */
+export async function oauthSignInAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const start = rateLimit(`oauth-sign-in:${await getClientIp()}`, { limit: 20, windowMs: FIFTEEN_MINUTES_MS })
+  if (!start.ok) {
+    return { error: tooManyAttemptsMessage(start.retryAfterMs) }
+  }
+
+  const providerId = formData.get('provider')
+  const provider = typeof providerId === 'string' ? findOAuthProvider(providerId) : undefined
+  if (!provider) {
+    return { error: 'This sign-in option is not available.' }
+  }
+
+  const signedIn = Boolean((await auth())?.user?.id)
+  if (signedIn && (await sessionCookieState()) !== 'recent') {
+    return { error: RECENT_SIGN_IN_REQUIRED }
+  }
+  await signIn(provider.id, { redirectTo: signedIn ? '/profile' : '/qrcodes' })
 }
 
 /** Signs out and redirects to `/login`. */
@@ -262,7 +291,7 @@ export async function forgotPasswordAction(_prevState: FormState, formData: Form
 /**
  * Sets a new password from a reset token, revokes every existing session of
  * the account, lifts its failed sign-in limit and confirms its email if it
- * wasn't yet. Does not sign in. Rate-limited per IP.
+ * wasn't yet. Signs this browser out rather than in. Rate-limited per IP.
  */
 export async function resetPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const reset = rateLimit(`reset-password:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
@@ -307,6 +336,8 @@ export async function resetPasswordAction(_prevState: FormState, formData: FormD
     },
   })
   clearLoginAttempts(user.email)
+  // The new password ends every session; this browser signs in with it too.
+  if (await auth()) await signOut({ redirect: false })
 
   return { success: true }
 }

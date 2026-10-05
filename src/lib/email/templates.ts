@@ -54,3 +54,40 @@ export const accountExists = defineTemplate({
     ],
   }),
 })
+
+/**
+ * Sent when a sign-in provider is connected to an existing account, so the
+ * owner notices a connection made by someone else with access to the session.
+ */
+export const providerConnected = defineTemplate({
+  name: 'providerConnected',
+  schema: z.object({
+    userName: z.string().optional(),
+    providerName: z.string(),
+    profileUrl: httpUrl,
+  }),
+  messages: {
+    en: {
+      subject: '{providerName} was connected to your account',
+      preheader: 'You can now sign in to {companyName} with {providerName}.',
+      heading: 'A sign-in provider was connected',
+      intro: '{providerName} was connected to your {companyName} account. It can now be used to sign in.',
+      button: 'Review connected accounts',
+      notYou:
+        "If you didn't do this, disconnect it on your profile page, change your password and contact us at {supportEmail}.",
+    },
+  },
+  render: ({ props, ui, t, branding }) => ({
+    subject: t('providerConnected.subject', { providerName: props.providerName }),
+    preheader: t('providerConnected.preheader', { providerName: props.providerName }),
+    body: [
+      ui.heading(t('providerConnected.heading')),
+      ui.paragraph(props.userName ? t('common.greeting', { name: props.userName }) : t('common.greetingAnonymous')),
+      ui.paragraph(t('providerConnected.intro', { providerName: props.providerName })),
+      ui.button(t('providerConnected.button'), props.profileUrl),
+      ui.linkFallback(props.profileUrl),
+      ui.divider(),
+      ui.note(t('providerConnected.notYou', { supportEmail: branding.supportEmail })),
+    ],
+  }),
+})
