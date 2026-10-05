@@ -22,8 +22,10 @@ function codesLabel(count: number): string {
   return `${count} QR code${count === 1 ? '' : 's'}`
 }
 
-function DeleteAccountDialogForm({ email, qrCodeCount }: { email: string; qrCodeCount: number }) {
-  const [currentPassword, setCurrentPassword] = useState('')
+type DeleteAccountProps = { email: string; hasPassword: boolean; qrCodeCount: number }
+
+function DeleteAccountDialogForm({ email, hasPassword, qrCodeCount }: DeleteAccountProps) {
+  const [confirmation, setConfirmation] = useState('')
   const [state, action, pending] = useActionState<FormState, FormData>(deleteAccountAction, undefined)
 
   return (
@@ -43,21 +45,40 @@ function DeleteAccountDialogForm({ email, qrCodeCount }: { email: string; qrCode
         </AlertDialogDescription>
       </AlertDialogHeader>
       <FieldGroup>
-        <input type="email" value={email} autoComplete="username" readOnly hidden />
-        <Field>
-          <FieldLabel htmlFor="deleteAccountPassword">Current password</FieldLabel>
-          <FieldContent>
-            <Input
-              id="deleteAccountPassword"
-              name="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              required
-            />
-          </FieldContent>
-        </Field>
+        {hasPassword ? (
+          <>
+            <input type="email" value={email} autoComplete="username" readOnly hidden />
+            <Field>
+              <FieldLabel htmlFor="deleteAccountPassword">Current password</FieldLabel>
+              <FieldContent>
+                <Input
+                  id="deleteAccountPassword"
+                  name="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  value={confirmation}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                  required
+                />
+              </FieldContent>
+            </Field>
+          </>
+        ) : (
+          <Field>
+            <FieldLabel htmlFor="deleteAccountEmail">Type {email} to confirm</FieldLabel>
+            <FieldContent>
+              <Input
+                id="deleteAccountEmail"
+                name="confirmEmail"
+                type="email"
+                autoComplete="off"
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value)}
+                required
+              />
+            </FieldContent>
+          </Field>
+        )}
         {state?.error && <FieldError>{state.error}</FieldError>}
       </FieldGroup>
       <AlertDialogFooter>
@@ -70,7 +91,7 @@ function DeleteAccountDialogForm({ email, qrCodeCount }: { email: string; qrCode
   )
 }
 
-export function DeleteAccountForm({ email, qrCodeCount }: { email: string; qrCodeCount: number }) {
+export function DeleteAccountForm({ email, hasPassword, qrCodeCount }: DeleteAccountProps) {
   return (
     <Card>
       <CardHeader>
@@ -85,7 +106,7 @@ export function DeleteAccountForm({ email, qrCodeCount }: { email: string; qrCod
         <AlertDialog>
           <AlertDialogTrigger render={<Button variant="destructive" />}>Delete account</AlertDialogTrigger>
           <AlertDialogContent>
-            <DeleteAccountDialogForm email={email} qrCodeCount={qrCodeCount} />
+            <DeleteAccountDialogForm email={email} hasPassword={hasPassword} qrCodeCount={qrCodeCount} />
           </AlertDialogContent>
         </AlertDialog>
       </CardContent>

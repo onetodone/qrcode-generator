@@ -17,9 +17,10 @@ export const changePasswordSchema = z
   })
   .refine(passwordsMatch, passwordsMatchError)
 
-/** Delete-account form: the current password. */
+/** Delete-account form: the current password, or the account's email for an account without a password. */
 export const deleteAccountSchema = z.object({
-  currentPassword: z.string().min(1, { error: 'Enter your current password to delete your account.' }),
+  currentPassword: z.string().optional(),
+  confirmEmail: z.string().trim().optional(),
 })
 
 /** Parsed `updateProfileSchema` input. */
