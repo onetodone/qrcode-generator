@@ -1,6 +1,6 @@
 {
   "name": "qrcode-generator",
-  "version": "5.4.0",
+  "version": "5.4.1",
   "description": "QR code generator with scan tracking — create QR codes, redirect scans through a short link, and see view counts per code.",
   "private": true,
   "author": "Anton Holubeu (https://github.com/aholu)",
@@ -39,7 +39,7 @@
     "@auth/prisma-adapter": "^2.11.3",
     "@base-ui/react": "^1.8.0",
     "@next/third-parties": "^16.3.8",
-    "@onetodone/mailer": "^0.2.3",
+    "@onetodone/mailer": "^0.2.4",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bcryptjs": "^3.0.3",
@@ -47,7 +47,7 @@
     "clsx": "^2.1.1",
     "dotenv": "^18.0.5",
     "isbot": "^5.2.2",
-    "lucide-react": "^1.51.0",
+    "lucide-react": "^1.52.0",
     "next": "16.3.8",
     "next-auth": "5.0.0-beta.32",
     "next-themes": "^0.4.6",
@@ -78,5 +78,5 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3"
   },
-  "packageManager": "pnpm@12.8.1"
+  "packageManager": "pnpm@12.9.1"
 }
