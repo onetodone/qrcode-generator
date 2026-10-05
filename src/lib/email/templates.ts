@@ -1,5 +1,6 @@
 import * as z from 'zod'
 import { defineTemplate, html, safeUrl } from '@onetodone/mailer'
+import { QrDisabledReason } from '@/generated/client'
 
 const httpUrl = z.url({ protocol: /^https?$/ })
 
@@ -90,4 +91,127 @@ export const providerConnected = defineTemplate({
       ui.note(t('providerConnected.notYou', { supportEmail: branding.supportEmail })),
     ],
   }),
+})
+
+/**
+ * Sent when codes stop redirecting: a Safe Browsing re-check flagged the
+ * destination, an operator disabled them, or the account was suspended. It
+ * names the codes, the reason and what the owner can do, as the statement of
+ * reasons the EU Digital Services Act expects.
+ */
+export const codeDisabled = defineTemplate({
+  name: 'codeDisabled',
+  schema: z.object({
+    userName: z.string().optional(),
+    reason: z.enum(QrDisabledReason),
+    codes: z.array(z.object({ note: z.string(), shortUrl: httpUrl, destination: z.string().optional() })),
+    editUrl: httpUrl.optional(),
+    termsUrl: httpUrl,
+  }),
+  messages: {
+    en: {
+      subject: { one: 'We disabled your QR code', other: 'We disabled {count} of your QR codes' },
+      subjectSuspended: 'We suspended your account',
+      preheader: { one: 'It no longer opens its website.', other: 'They no longer open their websites.' },
+      preheaderSuspended: 'You can no longer sign in, and your QR codes no longer open their websites.',
+      introUnsafe:
+        'We disabled this QR code because Google Safe Browsing reports the website it opens as dangerous (malware, phishing or unwanted software):',
+      introManual: {
+        one: 'We disabled this QR code because it breaks our {terms}:',
+        other: 'We disabled these QR codes because they break our {terms}:',
+      },
+      introSuspended:
+        'We suspended your {companyName} account because it breaks our {terms}. You can no longer sign in, create QR codes or edit them.',
+      codesSuspended: {
+        one: 'We also disabled your QR code:',
+        other: 'We also disabled your {count} QR codes:',
+      },
+      effect: {
+        one: 'People who scan it or open its short link now see a “Link disabled” page instead of the website.',
+        other: 'People who scan them or open their short links now see a “Link disabled” page instead of the websites.',
+      },
+      noNote: 'No note',
+      opens: 'Opens: {destination}',
+      shortLink: 'Short link: {shortUrl}',
+      actionUnsafe:
+        'To turn the code back on, change where it leads to a safe website. If you think the website was reported by mistake, write to us at {supportEmail}.',
+      actionManual: 'If you think we made a mistake, write to us at {supportEmail}.',
+      termsLink: 'Terms of Use',
+      button: 'Change where it leads',
+    },
+  },
+  render: ({ props, ui, t, branding }) => {
+    const terms = link(props.termsUrl, t('codeDisabled.termsLink'), branding.theme.primary)
+    const count = props.codes.length
+    const codeBlocks = props.codes.map((code) =>
+      ui.paragraph(
+        [
+          code.note || t('codeDisabled.noNote'),
+          code.destination && t('codeDisabled.opens', { destination: code.destination }),
+          t('codeDisabled.shortLink', { shortUrl: code.shortUrl }),
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      ),
+    )
+    const greeting = ui.paragraph(
+      props.userName ? t('common.greeting', { name: props.userName }) : t('common.greetingAnonymous'),
+    )
+    const contact = ui.note(t('codeDisabled.actionManual', { supportEmail: branding.supportEmail }))
+
+    if (props.reason === QrDisabledReason.ACCOUNT_SUSPENDED) {
+      return {
+        subject: t('codeDisabled.subjectSuspended'),
+        preheader: t('codeDisabled.preheaderSuspended'),
+        body: [
+          ui.heading(t('codeDisabled.subjectSuspended')),
+          greeting,
+          ui.paragraph(t.html('codeDisabled.introSuspended', { terms })),
+          ...(count > 0
+            ? [
+                ui.paragraph(t('codeDisabled.codesSuspended', { count })),
+                ...codeBlocks,
+                ui.paragraph(t('codeDisabled.effect', { count })),
+              ]
+            : []),
+          ui.divider(),
+          contact,
+        ],
+      }
+    }
+
+    const subject = t('codeDisabled.subject', { count })
+    const head = [ui.heading(subject), greeting]
+    const preheader = t('codeDisabled.preheader', { count })
+
+    if (props.reason === QrDisabledReason.UNSAFE_DESTINATION) {
+      return {
+        subject,
+        preheader,
+        body: [
+          ...head,
+          ui.paragraph(t('codeDisabled.introUnsafe')),
+          ...codeBlocks,
+          ui.paragraph(t('codeDisabled.effect', { count })),
+          ui.paragraph(t('codeDisabled.actionUnsafe', { supportEmail: branding.supportEmail })),
+          ...(props.editUrl
+            ? [ui.button(t('codeDisabled.button'), props.editUrl), ui.linkFallback(props.editUrl)]
+            : []),
+        ],
+      }
+    }
+
+    return {
+      subject,
+      preheader,
+      body: [
+        ...head,
+        ui.paragraph(t.html('codeDisabled.introManual', { count, terms })),
+        ...codeBlocks,
+        ui.paragraph(t('codeDisabled.effect', { count })),
+        ui.divider(),
+        contact,
+      ],
+    }
+  },
 })

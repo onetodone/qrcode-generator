@@ -1,3 +1,4 @@
+import type { QrDisabledReason } from '@/generated/client'
 import { getAppUrl, getMailer } from '@/lib/email'
 
 /** The account an email is about: its address and the name for the greeting. */
@@ -59,5 +60,39 @@ export async function sendProviderConnectedNotice(account: AccountRecipient, pro
   await getMailer().send('providerConnected', {
     to: account.email,
     props: { userName: account.name ?? undefined, providerName, profileUrl: `${appUrl}/profile` },
+  })
+}
+
+/**
+ * A disabled code: its ID, the note the owner gave it, its short link hash and
+ * where it leads. `leadsTo` is left out for a destination flagged as unsafe.
+ */
+export type DisabledCode = { id: string; note: string; urlHash: string; leadsTo?: string }
+
+/**
+ * Tells the owner that `codes` stopped redirecting and why, or for
+ * `ACCOUNT_SUSPENDED` that the account was suspended, listing the codes the
+ * suspension disabled. Throws when the email can't be sent.
+ */
+export async function sendCodesDisabledNotice(
+  account: AccountRecipient,
+  reason: QrDisabledReason,
+  codes: DisabledCode[],
+): Promise<void> {
+  const appUrl = getAppUrl()
+  const [onlyCode] = codes.length === 1 ? codes : []
+  await getMailer().send('codeDisabled', {
+    to: account.email,
+    props: {
+      userName: account.name ?? undefined,
+      reason,
+      codes: codes.map((code) => ({
+        note: code.note,
+        shortUrl: `${appUrl}/s/${code.urlHash}`,
+        destination: code.leadsTo,
+      })),
+      editUrl: onlyCode && `${appUrl}/qrcodes/${onlyCode.id}/edit`,
+      termsUrl: `${appUrl}/terms-of-use`,
+    },
   })
 }

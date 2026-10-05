@@ -1,5 +1,5 @@
 import { QrDisabledReason } from '../prisma/generated/client'
-import { hashFromInput, prisma, runOperatorScript } from './operator'
+import { hashFromInput, notifyOwner, prisma, runOperatorScript } from './operator'
 
 // Disables or re-enables QR codes by hand, e.g. after an abuse report.
 
@@ -18,7 +18,7 @@ async function main() {
   const hash = hashFromInput(target)
   const code = await prisma.qrCode.findUnique({
     where: { urlHash: hash },
-    select: { userId: true, user: { select: { email: true } } },
+    select: { userId: true, user: { select: { email: true, name: true } } },
   })
   if (!code) {
     console.error(`No QR code with hash ${hash}.`)
@@ -27,6 +27,14 @@ async function main() {
   }
 
   const scope = flags.includes('--owner') ? { userId: code.userId } : { urlHash: hash }
+  const newlyDisabled =
+    command === 'disable'
+      ? await prisma.qrCode.findMany({
+          where: { ...scope, disabledAt: null },
+          select: { id: true, note: true, urlHash: true, leadsTo: true },
+          orderBy: { createdAt: 'asc' },
+        })
+      : []
   const { count } =
     command === 'disable'
       ? await prisma.qrCode.updateMany({
@@ -40,6 +48,8 @@ async function main() {
 
   console.log(`${command === 'disable' ? 'Disabled' : 'Enabled'} ${count} QR code(s) owned by ${code.user.email}.`)
   console.log('Running app instances may serve cached redirects for up to 60 s.')
+
+  if (newlyDisabled.length > 0) await notifyOwner(code.user, QrDisabledReason.MANUAL, newlyDisabled)
 }
 
 runOperatorScript(main)

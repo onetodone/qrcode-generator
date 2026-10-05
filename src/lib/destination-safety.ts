@@ -1,6 +1,7 @@
 import { QrDisabledReason } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { sendCodesDisabledNotice } from '@/lib/account-emails'
 import { invalidateRedirect } from '@/lib/redirect-cache'
 import { isSafeBrowsingEnabled, lookupUrl, type UrlVerdict } from '@/lib/safe-browsing'
 
@@ -71,11 +72,24 @@ export async function recheckDestination(code: DestinationState): Promise<void> 
       where: { urlHash, leadsTo, disabledAt: null },
       data: { disabledAt: new Date(), disabledReason: QrDisabledReason.UNSAFE_DESTINATION },
     })
-    if (disabled.count > 0) {
-      invalidateRedirect(urlHash)
-      logger.warn('qr.disabled_unsafe_destination', { hash: urlHash, threatTypes: verdict.threatTypes })
-    }
+    if (disabled.count === 0) return
+
+    invalidateRedirect(urlHash)
+    logger.warn('qr.disabled_unsafe_destination', { hash: urlHash, threatTypes: verdict.threatTypes })
+    await notifyOwner(urlHash)
   } catch (error) {
     logger.error('qr.destination_recheck_failed', { error, hash: urlHash })
+  }
+}
+
+async function notifyOwner(urlHash: string): Promise<void> {
+  try {
+    const code = await prisma.qrCode.findUnique({
+      where: { urlHash },
+      select: { id: true, note: true, urlHash: true, user: { select: { email: true, name: true } } },
+    })
+    if (code) await sendCodesDisabledNotice(code.user, QrDisabledReason.UNSAFE_DESTINATION, [code])
+  } catch (error) {
+    logger.error('qr.disabled_notice_failed', { error, hash: urlHash })
   }
 }

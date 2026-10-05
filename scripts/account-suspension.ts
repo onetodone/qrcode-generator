@@ -1,5 +1,5 @@
 import { QrDisabledReason } from '../prisma/generated/client'
-import { hashFromInput, prisma, runOperatorScript } from './operator'
+import { hashFromInput, notifyOwner, prisma, runOperatorScript } from './operator'
 
 // Suspends an account that breaks the Terms of Use, or lifts the suspension.
 
@@ -9,12 +9,15 @@ const USAGE = `Usage:
 
 async function findUser(target: string) {
   if (target.includes('@') && !target.includes('/')) {
-    return prisma.user.findUnique({ where: { email: target }, select: { id: true, email: true } })
+    return prisma.user.findUnique({
+      where: { email: target },
+      select: { id: true, email: true, name: true, suspendedAt: true },
+    })
   }
 
   const code = await prisma.qrCode.findUnique({
     where: { urlHash: hashFromInput(target) },
-    select: { user: { select: { id: true, email: true } } },
+    select: { user: { select: { id: true, email: true, name: true, suspendedAt: true } } },
   })
   return code?.user ?? null
 }
@@ -34,24 +37,42 @@ async function main() {
     return
   }
 
-  const { count } = await prisma.$transaction(async (tx) => {
-    if (command === 'suspend') {
-      await tx.user.update({ where: { id: user.id }, data: { suspendedAt: new Date() } })
+  if (command === 'unsuspend') {
+    const { count } = await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data: { suspendedAt: null } })
       return tx.qrCode.updateMany({
-        where: { userId: user.id, disabledAt: null },
-        data: { disabledAt: new Date(), disabledReason: QrDisabledReason.ACCOUNT_SUSPENDED },
+        where: { userId: user.id, disabledReason: QrDisabledReason.ACCOUNT_SUSPENDED },
+        data: { disabledAt: null, disabledReason: null },
       })
-    }
+    })
+    console.log(`Unsuspended ${user.email}; updated ${count} QR code(s).`)
+    console.log('Running app instances may serve cached redirects for up to 60 s.')
+    return
+  }
 
-    await tx.user.update({ where: { id: user.id }, data: { suspendedAt: null } })
-    return tx.qrCode.updateMany({
-      where: { userId: user.id, disabledReason: QrDisabledReason.ACCOUNT_SUSPENDED },
-      data: { disabledAt: null, disabledReason: null },
+  if (user.suspendedAt) {
+    console.log(`${user.email} is already suspended.`)
+    return
+  }
+
+  const disabledAt = new Date()
+  const codes = await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: user.id }, data: { suspendedAt: disabledAt } })
+    await tx.qrCode.updateMany({
+      where: { userId: user.id, disabledAt: null },
+      data: { disabledAt, disabledReason: QrDisabledReason.ACCOUNT_SUSPENDED },
+    })
+    return tx.qrCode.findMany({
+      where: { userId: user.id, disabledAt, disabledReason: QrDisabledReason.ACCOUNT_SUSPENDED },
+      select: { id: true, note: true, urlHash: true, leadsTo: true },
+      orderBy: { createdAt: 'asc' },
     })
   })
 
-  console.log(`${command === 'suspend' ? 'Suspended' : 'Unsuspended'} ${user.email}; updated ${count} QR code(s).`)
+  console.log(`Suspended ${user.email}; updated ${codes.length} QR code(s).`)
   console.log('Running app instances may serve cached redirects for up to 60 s.')
+
+  await notifyOwner(user, QrDisabledReason.ACCOUNT_SUSPENDED, codes)
 }
 
 runOperatorScript(main)
