@@ -10,9 +10,9 @@ import { FieldError } from '@/components/ui/field'
 import { ProviderIcon } from '@/components/provider-icons'
 
 /**
- * "Continue with …" buttons for the enabled providers, with the terms notice
- * that continuing accepts, and an "or" divider before the email form. Renders
- * nothing without providers.
+ * A row of equal-width icon buttons, one per enabled provider and titled
+ * "Continue with …", with the terms notice that a new account accepts, and
+ * an "or" divider before the email form. Renders nothing without providers.
  */
 export function OAuthButtons({ providers, error }: { providers: OAuthProviderOption[]; error?: string | null }) {
   const [state, action, pending] = useActionState<FormState, FormData>(oauthSignInAction, undefined)
@@ -22,7 +22,7 @@ export function OAuthButtons({ providers, error }: { providers: OAuthProviderOpt
 
   return (
     <div className="mb-4 flex flex-col gap-4">
-      <form action={action} className="flex flex-col gap-2">
+      <form action={action} className="flex gap-2">
         {providers.map((provider) => (
           <Button
             key={provider.id}
@@ -31,15 +31,16 @@ export function OAuthButtons({ providers, error }: { providers: OAuthProviderOpt
             value={provider.id}
             variant="outline"
             disabled={pending}
-            className="w-full"
+            title={`Continue with ${provider.name}`}
+            aria-label={`Continue with ${provider.name}`}
+            className="min-w-0 flex-1"
           >
             <ProviderIcon providerId={provider.id} className="size-4" />
-            Continue with {provider.name}
           </Button>
         ))}
       </form>
-      <p className="text-center text-xs text-muted-foreground">
-        By continuing with a provider, you agree to the{' '}
+      <p className="text-xs text-muted-foreground">
+        By creating an account, you agree to the{' '}
         <Link href="/terms-of-use" target="_blank" className="underline underline-offset-4">
           Terms of Use
         </Link>{' '}
