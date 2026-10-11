@@ -106,7 +106,10 @@ export function QrCodeForm({
               </Field>
               <FieldSet>
                 <FieldLegend variant="label">Design</FieldLegend>
-                <FieldDescription>Shape and colors are baked into the QR image and its downloads.</FieldDescription>
+                <FieldDescription>
+                  Shape and colors are baked into the QR image and its downloads. The PNG download leaves the background
+                  transparent.
+                </FieldDescription>
                 <Field>
                   <FieldTitle>Shape</FieldTitle>
                   <div role="radiogroup" aria-label="Shape" className="flex flex-wrap gap-2">
