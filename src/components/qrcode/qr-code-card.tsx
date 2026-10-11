@@ -26,6 +26,8 @@ import { deleteQrCodeAction } from '@/actions/qrcode'
 
 // High enough resolution for print materials (posters, booklets).
 const DOWNLOAD_SIZE = 1024
+// Close to lossless, so module edges stay sharp for scanners.
+const JPEG_QUALITY = 0.95
 
 export type QrCodeCardData = {
   id: string
@@ -49,11 +51,16 @@ function triggerDownload(href: string, filename: string) {
   document.body.removeChild(link)
 }
 
-function upscaledClone(svg: SVGSVGElement): SVGSVGElement {
+function downloadClone(svg: SVGSVGElement, { transparent = false } = {}): SVGSVGElement {
   const clone = svg.cloneNode(true) as SVGSVGElement
   clone.setAttribute('width', String(DOWNLOAD_SIZE))
   clone.setAttribute('height', String(DOWNLOAD_SIZE))
+  if (transparent) clone.querySelector('[data-qr-background]')?.remove()
   return clone
+}
+
+function svgBlob(svg: SVGSVGElement): Blob {
+  return new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' })
 }
 
 export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
@@ -64,19 +71,16 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
     const svg = svgRef.current
     if (!svg) return
 
-    const serialized = new XMLSerializer().serializeToString(upscaledClone(svg))
-    const blob = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
+    const url = URL.createObjectURL(svgBlob(downloadClone(svg)))
     triggerDownload(url, `${downloadName}.svg`)
     URL.revokeObjectURL(url)
   }
 
-  function handleDownloadPng() {
+  function downloadRaster(type: 'image/png' | 'image/jpeg', extension: string, transparent: boolean) {
     const svg = svgRef.current
     if (!svg) return
 
-    const serialized = new XMLSerializer().serializeToString(upscaledClone(svg))
-    const url = URL.createObjectURL(new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' }))
+    const url = URL.createObjectURL(svgBlob(downloadClone(svg, { transparent })))
     const image = new Image()
     image.onload = () => {
       const canvas = document.createElement('canvas')
@@ -85,7 +89,7 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
       const context = canvas.getContext('2d')
       if (context) {
         context.drawImage(image, 0, 0, DOWNLOAD_SIZE, DOWNLOAD_SIZE)
-        triggerDownload(canvas.toDataURL('image/png'), `${downloadName}.png`)
+        triggerDownload(canvas.toDataURL(type, JPEG_QUALITY), `${downloadName}.${extension}`)
       }
       URL.revokeObjectURL(url)
     }
@@ -138,8 +142,17 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
           <Button type="button" variant="outline" size="sm" onClick={handleDownloadSvg}>
             SVG
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={handleDownloadPng}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            title="PNG with a transparent background"
+            onClick={() => downloadRaster('image/png', 'png', true)}
+          >
             PNG
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => downloadRaster('image/jpeg', 'jpg', false)}>
+            JPG
           </Button>
         </div>
         <div className="flex gap-1">

@@ -14,7 +14,7 @@ const STEPS = [
     icon: QrCodeIcon,
     title: 'Create a code',
     description:
-      'Enter a link, phone number or email address, pick a shape and colors, and download the code as SVG or PNG.',
+      'Enter a link, phone number or email address, pick a shape and colors, and download the code as SVG, PNG or JPG.',
   },
   {
     icon: Link2Icon,

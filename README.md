@@ -8,10 +8,11 @@ deployed.
 ## Features
 
 - **QR code generation** — client-side rendering (no server-side file
-  storage), downloadable as SVG or high-resolution PNG.
+  storage), downloadable as SVG, high-resolution JPG, or PNG with a
+  transparent background.
 - **Styled codes** — pick a module shape (square, rounded, dots) and
   foreground/background colours; the style is baked into the image and its
-  downloads.
+  downloads (the PNG keeps only the foreground).
 - **Scan tracking** — every code gets a short `/s/[hash]` redirect link;
   each human hit increments a view counter atomically (bot and preview-crawler
   hits are filtered out).

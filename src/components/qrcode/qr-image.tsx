@@ -95,7 +95,7 @@ export function QrImage({
       className={className}
     >
       {title ? <title>{title}</title> : null}
-      <rect width={dimension} height={dimension} fill={bgColor} />
+      <rect data-qr-background width={dimension} height={dimension} fill={bgColor} />
       <g fill={fgColor}>
         {squareRuns.length > 0 ? <path d={squareRuns.join('')} shapeRendering="crispEdges" /> : null}
         {decorations}
