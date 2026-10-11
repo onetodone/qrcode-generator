@@ -6,18 +6,26 @@ import { registerAction } from '@/actions/auth'
 import type { FormState } from '@/lib/forms'
 import type { OAuthProviderOption } from '@/lib/oauth-providers'
 import { OAuthButtons } from '@/components/oauth-buttons'
+import { Turnstile } from '@/components/turnstile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-export function RegisterForm({ providers }: { providers: OAuthProviderOption[] }) {
+export function RegisterForm({
+  providers,
+  captchaSiteKey,
+}: {
+  providers: OAuthProviderOption[]
+  captchaSiteKey: string | null
+}) {
   // Controlled so a validation error doesn't wipe the fields — React resets
   // uncontrolled fields after any Server Action completes, error or not.
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [acceptTerms, setAcceptTerms] = useState(false)
+  const [captchaReady, setCaptchaReady] = useState(false)
   const [state, action, pending] = useActionState<FormState, FormData>(registerAction, undefined)
 
   return (
@@ -81,8 +89,11 @@ export function RegisterForm({ providers }: { providers: OAuthProviderOption[] }
                 .
               </FieldLabel>
             </Field>
+            {captchaSiteKey && (
+              <Turnstile siteKey={captchaSiteKey} action="register" resetKey={state} onReadyChange={setCaptchaReady} />
+            )}
             {state?.error && <FieldError>{state.error}</FieldError>}
-            <Button type="submit" disabled={pending} className="w-full">
+            <Button type="submit" disabled={pending || (captchaSiteKey !== null && !captchaReady)} className="w-full">
               {pending ? 'Creating account...' : 'Create account'}
             </Button>
           </FieldGroup>

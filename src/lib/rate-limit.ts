@@ -49,6 +49,12 @@ export function rateLimit(key: string, { limit, windowMs }: { limit: number; win
   }
 }
 
+/** Attempts recorded for `key` in its current window, without recording one. */
+export function peekRateLimit(key: string): number {
+  const bucket = buckets.get(key)
+  return bucket && bucket.resetAt > Date.now() ? bucket.count : 0
+}
+
 /**
  * Takes back one attempt recorded by `rateLimit`. Used for attempts that turn
  * out not to count; recording first and refunding later keeps concurrent

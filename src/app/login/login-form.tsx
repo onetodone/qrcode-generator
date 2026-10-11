@@ -3,9 +3,10 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { loginAction } from '@/actions/auth'
-import type { FormState } from '@/lib/forms'
+import type { LoginFormState } from '@/lib/forms'
 import type { OAuthProviderOption } from '@/lib/oauth-providers'
 import { OAuthButtons } from '@/components/oauth-buttons'
+import { Turnstile } from '@/components/turnstile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,15 +15,21 @@ import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/compo
 export function LoginForm({
   providers,
   providerError,
+  captchaSiteKey,
+  captchaRequired,
 }: {
   providers: OAuthProviderOption[]
   providerError: string | null
+  captchaSiteKey: string | null
+  captchaRequired: boolean
 }) {
   // Controlled so a validation error doesn't wipe the fields — React resets
   // uncontrolled fields after any Server Action completes, error or not.
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [state, action, pending] = useActionState<FormState, FormData>(loginAction, undefined)
+  const [captchaReady, setCaptchaReady] = useState(false)
+  const [state, action, pending] = useActionState<LoginFormState, FormData>(loginAction, undefined)
+  const showCaptcha = captchaSiteKey !== null && (state?.captchaRequired ?? captchaRequired)
 
   return (
     <Card className="w-full max-w-sm">
@@ -70,8 +77,11 @@ export function LoginForm({
                 />
               </FieldContent>
             </Field>
+            {showCaptcha && (
+              <Turnstile siteKey={captchaSiteKey} action="login" resetKey={state} onReadyChange={setCaptchaReady} />
+            )}
             {state?.error && <FieldError>{state.error}</FieldError>}
-            <Button type="submit" disabled={pending} className="w-full">
+            <Button type="submit" disabled={pending || (showCaptcha && !captchaReady)} className="w-full">
               {pending ? 'Signing in...' : 'Sign in'}
             </Button>
           </FieldGroup>

@@ -1,8 +1,9 @@
 import { getAnalyticsId } from '@/lib/analytics'
 import { isSafeBrowsingEnabled } from '@/lib/safe-browsing'
+import { isCaptchaEnabled } from '@/lib/captcha'
 
 /** Date the Terms of Use and Privacy Policy last changed. */
-export const LEGAL_LAST_UPDATED = new Date('2026-10-02T00:00:00Z')
+export const LEGAL_LAST_UPDATED = new Date('2026-10-11T00:00:00Z')
 
 /**
  * Who runs this instance, how to reach them, and which optional services it
@@ -15,6 +16,7 @@ export type LegalInfo = {
   abuseEmail: string | null
   analytics: boolean
   safeBrowsing: boolean
+  captcha: boolean
   vercel: boolean
 }
 
@@ -25,7 +27,7 @@ function envValue(name: string): string | null {
 /**
  * Reads `LEGAL_OPERATOR_NAME`, `LEGAL_JURISDICTION`, `SUPPORT_EMAIL` and
  * `ABUSE_EMAIL` (falling back to `SUPPORT_EMAIL`), and whether Google
- * Analytics, Safe Browsing and Vercel are in use. Never throws, so the legal
+ * Analytics, Safe Browsing, Cloudflare Turnstile and Vercel are in use. Never throws, so the legal
  * pages render on an incomplete setup.
  */
 export function getLegalInfo(): LegalInfo {
@@ -37,6 +39,7 @@ export function getLegalInfo(): LegalInfo {
     abuseEmail: envValue('ABUSE_EMAIL') ?? supportEmail,
     analytics: getAnalyticsId() !== null,
     safeBrowsing: isSafeBrowsingEnabled(),
+    captcha: isCaptchaEnabled(),
     vercel: Boolean(process.env.VERCEL),
   }
 }

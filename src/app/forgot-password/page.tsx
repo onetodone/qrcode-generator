@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
 import { AuthLayout } from '@/components/auth-card'
+import { getCaptchaSiteKey } from '@/lib/captcha'
 import { ForgotPasswordForm } from './forgot-password-form'
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export default async function ForgotPasswordPage() {
 
   return (
     <AuthLayout>
-      <ForgotPasswordForm />
+      <ForgotPasswordForm captchaSiteKey={getCaptchaSiteKey()} />
     </AuthLayout>
   )
 }

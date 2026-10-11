@@ -6,8 +6,10 @@ import {
   auth,
   clearLoginAttempts,
   AccountSuspendedSignin,
+  CaptchaRequiredSignin,
   ConfirmationEmailFailedSignin,
   EmailNotVerifiedSignin,
+  isLoginCaptchaRequired,
   RateLimitedSignin,
   sessionCookieState,
   signIn,
@@ -30,12 +32,13 @@ import {
 } from '@/schemas/auth'
 import { rateLimit, refundRateLimit, tooManyAttemptsMessage } from '@/lib/rate-limit'
 import { getClientIp } from '@/lib/request'
-import { firstZodError, type FormState } from '@/lib/forms'
+import { firstZodError, type FormState, type LoginFormState } from '@/lib/forms'
 import { hashPassword } from '@/lib/password'
 import { logger } from '@/lib/logger'
 import { accountSuspendedMessage } from '@/lib/auth-guard'
 import { findOAuthProvider } from '@/lib/oauth-providers'
 import { RECENT_SIGN_IN_REQUIRED } from '@/lib/sign-in-errors'
+import { CAPTCHA_FIELD, captchaErrorMessage, verifyCaptcha } from '@/lib/captcha'
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 const ONE_HOUR_MS = 60 * 60 * 1000
@@ -45,41 +48,48 @@ const CONFIRMATION_EMAIL_FAILED = "We couldn't send the confirmation email. Plea
 /**
  * Signs in with email and password. An unconfirmed account gets a fresh
  * confirmation link and is redirected to `/verify-email`. Failed attempts are
- * rate-limited per IP and per email in `authorize()`.
+ * rate-limited per IP and per email in `authorize()`, and after a few of them
+ * the Turnstile check is required; every error says whether the next attempt
+ * needs it.
  */
-export async function loginAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+export async function loginAction(_prevState: LoginFormState, formData: FormData): Promise<LoginFormState> {
+  const ip = await getClientIp()
   const parsed = loginSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
   })
 
   if (!parsed.success) {
-    return { error: 'Please enter a valid email and password.' }
+    return { error: 'Please enter a valid email and password.', captchaRequired: isLoginCaptchaRequired(ip) }
   }
 
+  const error = await signInWithPassword(parsed.data.email, parsed.data.password, formData.get(CAPTCHA_FIELD))
+  return { error, captchaRequired: isLoginCaptchaRequired(ip, parsed.data.email) }
+}
+
+/** Runs the credentials sign-in and redirects on success; returns the message for a failed one. */
+async function signInWithPassword(
+  email: string,
+  password: string,
+  captchaToken: FormDataEntryValue | null,
+): Promise<string | undefined> {
   try {
     await signIn('credentials', {
-      email: parsed.data.email,
-      password: parsed.data.password,
+      email,
+      password,
+      ...(typeof captchaToken === 'string' ? { captchaToken } : {}),
       redirectTo: '/qrcodes',
     })
   } catch (error) {
     if (error instanceof EmailNotVerifiedSignin) {
-      await storeHandoffCookie('pendingEmail', parsed.data.email)
+      await storeHandoffCookie('pendingEmail', email)
       redirect('/verify-email')
     }
-    if (error instanceof AccountSuspendedSignin) {
-      return { error: accountSuspendedMessage() }
-    }
-    if (error instanceof ConfirmationEmailFailedSignin) {
-      return { error: CONFIRMATION_EMAIL_FAILED }
-    }
-    if (error instanceof RateLimitedSignin) {
-      return { error: tooManyAttemptsMessage(error.retryAfterMs) }
-    }
-    if (error instanceof AuthError) {
-      return { error: 'Invalid email or password.' }
-    }
+    if (error instanceof AccountSuspendedSignin) return accountSuspendedMessage()
+    if (error instanceof ConfirmationEmailFailedSignin) return CONFIRMATION_EMAIL_FAILED
+    if (error instanceof RateLimitedSignin) return tooManyAttemptsMessage(error.retryAfterMs)
+    if (error instanceof CaptchaRequiredSignin) return captchaErrorMessage(error.result)
+    if (error instanceof AuthError) return 'Invalid email or password.'
     throw error
   }
 }
@@ -149,10 +159,11 @@ async function sendRegistrationEmail(name: string, email: string): Promise<void>
  * the same answer and one email, so the form can't be used to probe for
  * accounts; the password is chosen when the address is confirmed. When the
  * email can't be sent, the form shows an error. Rate-limited per IP and per
- * address.
+ * address, and behind the Turnstile check when it is on.
  */
 export async function registerAction(_prevState: FormState, formData: FormData): Promise<FormState> {
-  const register = rateLimit(`register:${await getClientIp()}`, { limit: 5, windowMs: ONE_HOUR_MS })
+  const ip = await getClientIp()
+  const register = rateLimit(`register:${ip}`, { limit: 5, windowMs: ONE_HOUR_MS })
   if (!register.ok) {
     return { error: tooManyAttemptsMessage(register.retryAfterMs) }
   }
@@ -165,6 +176,11 @@ export async function registerAction(_prevState: FormState, formData: FormData):
 
   if (!parsed.success) {
     return { error: firstZodError(parsed.error) }
+  }
+
+  const captcha = await verifyCaptcha(formData.get(CAPTCHA_FIELD), 'register', ip)
+  if (captcha !== 'ok') {
+    return { error: captchaErrorMessage(captcha) }
   }
 
   const { name, email } = parsed.data
@@ -264,10 +280,11 @@ export async function resendVerificationEmailAction(_prevState: FormState, formD
  * Emails a password reset link when the account exists. The lookup and the
  * email run after the response, so every address gets the same answer in the
  * same time and the form can't be used to probe for accounts. Rate-limited
- * per IP.
+ * per IP, and behind the Turnstile check when it is on.
  */
 export async function forgotPasswordAction(_prevState: FormState, formData: FormData): Promise<FormState> {
-  const forgot = rateLimit(`forgot-password:${await getClientIp()}`, { limit: 5, windowMs: FIFTEEN_MINUTES_MS })
+  const ip = await getClientIp()
+  const forgot = rateLimit(`forgot-password:${ip}`, { limit: 5, windowMs: FIFTEEN_MINUTES_MS })
   if (!forgot.ok) {
     return { error: tooManyAttemptsMessage(forgot.retryAfterMs) }
   }
@@ -275,6 +292,11 @@ export async function forgotPasswordAction(_prevState: FormState, formData: Form
   const parsed = emailSchema.safeParse(formData.get('email'))
   if (!parsed.success) {
     return { error: 'Please enter a valid email address.' }
+  }
+
+  const captcha = await verifyCaptcha(formData.get(CAPTCHA_FIELD), 'forgot-password', ip)
+  if (captcha !== 'ok') {
+    return { error: captchaErrorMessage(captcha) }
   }
 
   const email = parsed.data
