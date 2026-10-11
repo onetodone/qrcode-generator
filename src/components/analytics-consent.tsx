@@ -2,8 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { GoogleAnalytics } from '@next/third-parties/google'
-import { AnalyticsIdentifier } from '@/components/analytics-identifier'
+import { GoogleAnalytics } from '@/components/google-analytics'
 import { Button } from '@/components/ui/button'
 import { ANALYTICS_CONSENT_COOKIE, ANALYTICS_CONSENT_MAX_AGE_SECONDS, type AnalyticsConsent } from '@/lib/analytics'
 
@@ -93,12 +92,7 @@ export function AnalyticsConsentProvider({
   return (
     <OpenSettingsContext value={() => setBannerOpen(true)}>
       {children}
-      {consent === 'granted' && (
-        <>
-          <GoogleAnalytics gaId={gaId} />
-          <AnalyticsIdentifier userId={userId} />
-        </>
-      )}
+      {consent === 'granted' && <GoogleAnalytics gaId={gaId} userId={userId} />}
       {bannerOpen && <ConsentBanner onChoose={choose} />}
     </OpenSettingsContext>
   )
