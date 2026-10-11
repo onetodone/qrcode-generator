@@ -60,14 +60,3 @@ export function getSupportEmail(): string {
 
   return email
 }
-
-/** Public base URL from `APP_URL`, used for links and the logo in emails. Throws when unset. */
-export function getAppUrl(): string {
-  const url = process.env.APP_URL
-
-  if (!url) {
-    throw new Error('[email] APP_URL must be set')
-  }
-
-  return url
-}

@@ -1,9 +1,7 @@
 import type { MetadataRoute } from 'next'
+import { getSiteUrl } from '@/lib/app-url'
 
-const appUrl =
-  process.env.APP_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ??
-  `http://localhost:${process.env.PORT ?? 3000}`
+const appUrl = getSiteUrl()
 
 export default function robots(): MetadataRoute.Robots {
   return {

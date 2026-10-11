@@ -15,7 +15,8 @@ deployed.
   downloads (the PNG keeps only the foreground).
 - **Scan tracking** — every code gets a short `/s/[hash]` redirect link;
   each human hit increments a view counter atomically (bot and preview-crawler
-  hits are filtered out).
+  hits are filtered out). Short links can live on a domain of their own. See
+  [Short links](#short-links).
 - **Smart endpoint detection** — paste a URL, phone number, or email address
   as the destination and it's validated and normalized accordingly.
 - **Multi-user** — each account manages its own set of QR codes; email +
@@ -127,7 +128,7 @@ Sign-in requires a confirmed email address, so Compose refuses to start without
 `SMTP_HOST`, `SMTP_PORT` and `SUPPORT_EMAIL`. The SMTP settings must point at a
 mail server reachable from the container (`localhost` inside the container is
 the container itself). Set `APP_URL` to the address users open the app at —
-links in outgoing email are built from it.
+links in outgoing email and in QR codes are built from it.
 
 Logs and rate limits key on the client IP. The server takes it from
 `X-Forwarded-For` only when the request comes from a trusted peer, a reverse
@@ -138,6 +139,21 @@ socket address, so a client can't pick its own IP by sending the header.
 and private networks, `all` for a proxy on a public address such as a CDN in
 front of the origin, `none` for no proxy. Vercel sets the header itself and
 ignores the variable.
+
+## Short links
+
+The `/s/<hash>` link in a QR code is built from `SHORT_LINK_URL`, or from
+`APP_URL` when that is empty, never from the address the dashboard happens to
+be opened at (a `*.vercel.app` alias, an IP, `localhost`). A printed code keeps
+its link for good, so set the variable to a domain you'll keep. Only when
+neither variable is set does the link use the current request's address.
+
+A separate short-link domain must point at the same app. It serves `/s/*` and
+redirects every other path to `APP_URL`. Links on `APP_URL` keep working, so
+codes printed before the change still resolve. Use a separate registrable
+domain rather than a subdomain of the app's: Google Safe Browsing lists a whole
+domain with its subdomains, so a flagged redirect domain then doesn't take the
+app down with it.
 
 ## Sign-in providers
 

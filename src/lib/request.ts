@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { getAppHostname, getConfiguredShortLinkUrl, getShortLinkHostname } from '@/lib/app-url'
 
 /**
  * Client IP from the rightmost `X-Forwarded-For` entry, the one appended by
@@ -45,20 +46,30 @@ export function baseUrlFromHeaders(headerList: Headers): string {
   return `${proto}://${headerList.get('host')}`
 }
 
+/** Hostname from the `Host` header, without the port; empty when the header is missing or malformed. */
+export function hostnameFromHeaders(headerList: Headers): string {
+  try {
+    return new URL(baseUrlFromHeaders(headerList)).hostname
+  } catch {
+    return ''
+  }
+}
+
 /** `baseUrlFromHeaders` for the current request. */
 export async function getBaseUrl(): Promise<string> {
   return baseUrlFromHeaders(await headers())
 }
 
-/** Hostnames the app is reached at: the current request's host and `APP_URL`'s. */
+/**
+ * Base URL for `/s/<hash>` links: `SHORT_LINK_URL`, else `APP_URL`, else the
+ * current request's origin.
+ */
+export async function getShortLinkBaseUrl(): Promise<string> {
+  return getConfiguredShortLinkUrl() ?? (await getBaseUrl())
+}
+
+/** Hostnames the app is reached at: the current request's host, `APP_URL`'s and `SHORT_LINK_URL`'s. */
 export async function getAppHostnames(): Promise<string[]> {
-  const hostnames = [new URL(await getBaseUrl()).hostname]
-  if (process.env.APP_URL) {
-    try {
-      hostnames.push(new URL(process.env.APP_URL).hostname)
-    } catch {
-      // An invalid APP_URL only means one hostname fewer.
-    }
-  }
-  return hostnames
+  const hostnames = [hostnameFromHeaders(await headers()), getAppHostname(), getShortLinkHostname()]
+  return [...new Set(hostnames.filter((hostname): hostname is string => Boolean(hostname)))]
 }

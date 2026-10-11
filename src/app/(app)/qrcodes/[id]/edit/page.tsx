@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { getBaseUrl } from '@/lib/request'
+import { getShortLinkBaseUrl } from '@/lib/request'
 import { requireUserId } from '@/lib/auth-guard'
 import { updateQrCodeAction } from '@/actions/qrcode'
 import { PageContainer, PageHeader } from '@/components/page-header'
@@ -21,7 +21,7 @@ export default async function EditQrCodePage({ params }: { params: Promise<{ id:
     notFound()
   }
 
-  const baseUrl = await getBaseUrl()
+  const baseUrl = await getShortLinkBaseUrl()
 
   return (
     <PageContainer width="3xl">

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import { AnalyticsConsentProvider } from '@/components/analytics-consent'
+import { getSiteUrl } from '@/lib/app-url'
 import { getSessionUserId } from '@/lib/auth-guard'
 import { ANALYTICS_CONSENT_COOKIE, getAnalyticsId, parseAnalyticsConsent } from '@/lib/analytics'
 import './globals.css'
@@ -17,13 +18,8 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
-const appUrl =
-  process.env.APP_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ??
-  `http://localhost:${process.env.PORT ?? 3000}`
-
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
+  metadataBase: new URL(getSiteUrl()),
   title: {
     default: 'QR Code OneToDone',
     template: '%s | QR Code OneToDone',
