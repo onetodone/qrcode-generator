@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
+import { getAppUrl } from '@/lib/app-url'
 import { getMailer } from '@/lib/email'
 
 /** Minimum time between two links of one type to one address. */
@@ -57,10 +58,8 @@ export async function sendVerificationEmail(
     data: { identifier: email, token, type, expires: new Date(Date.now() + TOKEN_TTL_MS[type]) },
   })
 
-  const verifyUrl = `${process.env.APP_URL}${LINK_PATH[type]}?token=${token}`
-
   try {
-    await sendTokenEmail(type, email, verifyUrl)
+    await sendTokenEmail(type, email, `${getAppUrl()}${LINK_PATH[type]}?token=${token}`)
   } catch (error) {
     // A token nobody received would still start the resend cooldown.
     await prisma.verificationToken.delete({ where: { token } })

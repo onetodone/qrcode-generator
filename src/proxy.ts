@@ -2,8 +2,9 @@ import { after, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { logRequest } from '@/lib/logger'
 import { setHandoffCookie } from '@/lib/handoff-cookies'
-import { clientIpFromHeaders } from '@/lib/request'
+import { clientIpFromHeaders, hostnameFromHeaders } from '@/lib/request'
 import { enabledOAuthProviders } from '@/lib/oauth-providers'
+import { getAppHostname, getAppUrl, getShortLinkHostname } from '@/lib/app-url'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password']
 // Open to guests and signed-in users alike; matched exactly. A signed-in
@@ -20,6 +21,13 @@ const publicRoutes = [
 ]
 
 const isDev = process.env.NODE_ENV !== 'production'
+const appHostname = getAppHostname()
+const shortLinkHostname = getShortLinkHostname()
+// A separate short-link domain serves only `/s/*` (excluded by the matcher);
+// everything else on it belongs to the app, so it isn't a second copy of the
+// app with its own session cookies.
+const shortLinkOnlyHostname =
+  appHostname && shortLinkHostname && shortLinkHostname !== appHostname ? shortLinkHostname : null
 const cspConnectSrcExtra = process.env.CSP_CONNECT_SRC_EXTRA?.trim() ?? ''
 // A sign-in form submitted without JavaScript is redirected to the provider.
 const cspFormActionExtra = enabledOAuthProviders()
@@ -58,7 +66,9 @@ export default auth((req) => {
   const resetToken = nextUrl.pathname === '/reset-password' ? nextUrl.searchParams.get('token') : null
 
   let response: NextResponse
-  if (!isLoggedIn && !isPublicOnlyRoute && !isPublicRoute) {
+  if (shortLinkOnlyHostname && hostnameFromHeaders(req.headers) === shortLinkOnlyHostname) {
+    response = NextResponse.redirect(new URL(nextUrl.pathname + nextUrl.search, getAppUrl()))
+  } else if (!isLoggedIn && !isPublicOnlyRoute && !isPublicRoute) {
     response = NextResponse.redirect(new URL('/login', nextUrl))
   } else if (isLoggedIn && isPublicOnlyRoute) {
     // A failed attempt to connect a provider ends on the sign-in error page.

@@ -1,5 +1,6 @@
 import type { QrDisabledReason } from '@/generated/client'
-import { getAppUrl, getMailer } from '@/lib/email'
+import { getAppUrl, getConfiguredShortLinkUrl } from '@/lib/app-url'
+import { getMailer } from '@/lib/email'
 
 /** The account an email is about: its address and the name for the greeting. */
 export type AccountRecipient = { email: string; name: string | null }
@@ -80,6 +81,7 @@ export async function sendCodesDisabledNotice(
   codes: DisabledCode[],
 ): Promise<void> {
   const appUrl = getAppUrl()
+  const shortLinkUrl = getConfiguredShortLinkUrl() ?? appUrl
   const [onlyCode] = codes.length === 1 ? codes : []
   await getMailer().send('codeDisabled', {
     to: account.email,
@@ -88,7 +90,7 @@ export async function sendCodesDisabledNotice(
       reason,
       codes: codes.map((code) => ({
         note: code.note,
-        shortUrl: `${appUrl}/s/${code.urlHash}`,
+        shortUrl: `${shortLinkUrl}/s/${code.urlHash}`,
         destination: code.leadsTo,
       })),
       editUrl: onlyCode && `${appUrl}/qrcodes/${onlyCode.id}/edit`,

@@ -1,7 +1,8 @@
 import { createMailer } from '@onetodone/mailer'
 import { smtpTransport } from '@onetodone/mailer/smtp'
+import { getAppUrl } from '@/lib/app-url'
 import { logger } from '@/lib/logger'
-import { getAppUrl, getSender, getSmtpOptions, getSupportEmail } from './config'
+import { getSender, getSmtpOptions, getSupportEmail } from './config'
 import { accountExists, codeDisabled, providerConnected } from './templates'
 
 function createAppMailer() {

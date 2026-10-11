@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PlusIcon } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
-import { getBaseUrl } from '@/lib/request'
+import { getShortLinkBaseUrl } from '@/lib/request'
 import { requireUserId } from '@/lib/auth-guard'
 import { Button } from '@/components/ui/button'
 import { PageContainer, PageHeader } from '@/components/page-header'
@@ -17,7 +17,7 @@ export default async function DashboardPage() {
 
   const [qrCodes, baseUrl] = await Promise.all([
     prisma.qrCode.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-    getBaseUrl(),
+    getShortLinkBaseUrl(),
   ])
 
   const rows = qrCodes.map((qrCode) => ({
