@@ -33,6 +33,9 @@ deployed.
   stop redirecting and show a warning page. Destinations behind URL shorteners
   or on bare IP addresses are rejected. Each account can create up to 10 codes
   per 24 hours.
+- **Bot protection** — optional Cloudflare Turnstile check on registration,
+  password reset and repeated failed sign-ins. See
+  [Bot protection](#bot-protection).
 - **Legal pages and privacy** — Terms of Use and Privacy Policy pages filled
   in from the environment; registration requires agreeing to the terms; Google
   Analytics loads only after a visitor accepts it in a cookie banner; users can
@@ -85,6 +88,7 @@ deployed.
    | `LEGAL_OPERATOR_NAME` / `LEGAL_JURISDICTION`                        | Operator named on the legal pages, and the jurisdiction whose law governs the Terms (both optional). See [Legal pages](#legal-pages). |
    | `GATAG_ID`                                                          | Google Analytics measurement ID (optional). Loads only after a visitor accepts analytics cookies; its origins must be added to `CSP_CONNECT_SRC_EXTRA`. |
    | `SAFE_BROWSING_API_KEY`                                             | Google Safe Browsing API key (optional). Empty turns destination checks off. See [Unsafe destinations](#unsafe-destinations). |
+   | `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`                       | Cloudflare Turnstile widget keys (optional). Empty turns the bot check off. See [Bot protection](#bot-protection). |
    | `AUTH_<PROVIDER>_ID` / `AUTH_<PROVIDER>_SECRET`                     | OAuth client of a sign-in provider (optional). See [Sign-in providers](#sign-in-providers). |
 
 3. Apply database migrations:
@@ -249,6 +253,31 @@ place and the script exits with an error. With Docker Compose, run them in the
 `docker compose run --rm migrate pnpm qr:disable <hash>`. Running app instances
 may keep serving a cached redirect for up to 60 seconds.
 
+## Bot protection
+
+With `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` set, forms use
+[Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/), which
+checks the browser in the background and asks for a click only when it can't
+tell:
+
+- **Registration and forgot password** — every submission, since both email
+  an address typed into the form.
+- **Sign-in with a password** — after 3 failed attempts from the same IP or
+  for the same account within the 15-minute rate-limit window. The check runs
+  in Auth.js's `authorize()`, so posting to
+  `/api/auth/callback/credentials` directly doesn't skip it.
+
+Sign-in providers, QR code actions and `/s/[hash]` links never ask for it.
+A token issued for one form is rejected by another. When Cloudflare can't be
+reached, the form shows an error instead of letting the request through.
+
+To get the keys, add a widget in the Cloudflare dashboard (**Turnstile → Add
+widget**, mode **Managed**) for the domain in `APP_URL`. Turnstile is free.
+For local testing, Cloudflare's
+[testing keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)
+pass or fail every check (`1x00000000000000000000AA` with
+`1x0000000000000000000000000000000AA` always passes).
+
 ## Account suspension
 
 An account that breaks the Terms of Use can be suspended by email address, QR
@@ -280,9 +309,9 @@ required. They are rendered per request from the environment:
 - `LEGAL_JURISDICTION` — the governing law and courts for the Terms. Without
   it that section is left out.
 - `SUPPORT_EMAIL` and `ABUSE_EMAIL` — the contact and abuse-report addresses.
-- The Google Analytics and Safe Browsing sections appear only when `GATAG_ID`
-  and `SAFE_BROWSING_API_KEY` are set; the hosting provider is named only on
-  Vercel.
+- The Google Analytics, Safe Browsing and Cloudflare Turnstile sections
+  appear only when `GATAG_ID`, `SAFE_BROWSING_API_KEY` and the `TURNSTILE_*`
+  keys are set; the hosting provider is named only on Vercel.
 
 The texts are a starting point, not legal advice. Review them, and adjust them
 to your jurisdiction and providers, before running a public instance.

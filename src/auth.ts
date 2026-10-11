@@ -11,7 +11,8 @@ import { afterResponse } from '@/lib/after-response'
 import { loginSchema } from '@/schemas/auth'
 import { passwordField } from '@/schemas/password'
 import { hashPassword, verifyPasswordConstantTime } from '@/lib/password'
-import { clearRateLimit, rateLimit, refundRateLimit } from '@/lib/rate-limit'
+import { clearRateLimit, peekRateLimit, rateLimit, refundRateLimit } from '@/lib/rate-limit'
+import { type CaptchaResult, isCaptchaEnabled, verifyCaptcha } from '@/lib/captcha'
 import { clientIpFromHeaders } from '@/lib/request'
 import { logger } from '@/lib/logger'
 import { enabledOAuthProviders, findOAuthProvider, oauthProviderName, ProviderSignInError } from '@/lib/oauth-providers'
@@ -39,10 +40,33 @@ export class RateLimitedSignin extends CredentialsSignin {
   }
 }
 
+export class CaptchaRequiredSignin extends CredentialsSignin {
+  code = 'captcha_required'
+  constructor(public result: Exclude<CaptchaResult, 'ok'>) {
+    super()
+  }
+}
+
 const LOGIN_LIMIT = { limit: 10, windowMs: 15 * 60 * 1000 }
+const LOGIN_CAPTCHA_AFTER_FAILURES = 3
+
+function loginIpKey(ip: string): string {
+  return `login:ip:${ip}`
+}
 
 function loginEmailKey(email: string): string {
   return `login:email:${email.toLowerCase()}`
+}
+
+/**
+ * Whether a sign-in with a password from `ip` (for `email`, when known) needs
+ * the Turnstile check: it is on, and the IP or the account has failed attempts
+ * left in the current rate-limit window.
+ */
+export function isLoginCaptchaRequired(ip: string, email?: string): boolean {
+  if (!isCaptchaEnabled()) return false
+  const keys = email ? [loginIpKey(ip), loginEmailKey(email)] : [loginIpKey(ip)]
+  return keys.some((key) => peekRateLimit(key) >= LOGIN_CAPTCHA_AFTER_FAILURES)
 }
 
 /** Lets the account's owner sign in again right after a password reset. */
@@ -253,6 +277,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
         verificationToken: { label: 'Verification token', type: 'text' },
+        captchaToken: { label: 'Captcha token', type: 'text' },
       },
       authorize: async (credentials, request) => {
         if (typeof credentials?.verificationToken === 'string') {
@@ -266,7 +291,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         // /api/auth/callback/credentials` reaches `authorize()` directly. An
         // attempt with the right password is refunded, so successful sign-ins
         // don't use up the limit of a shared IP or of the account.
-        const limitKeys = [`login:ip:${clientIpFromHeaders(request.headers)}`, loginEmailKey(parsed.data.email)]
+        const ip = clientIpFromHeaders(request.headers)
+        if (isLoginCaptchaRequired(ip, parsed.data.email)) {
+          const captcha = await verifyCaptcha(credentials.captchaToken, 'login', ip)
+          if (captcha !== 'ok') throw new CaptchaRequiredSignin(captcha)
+        }
+
+        const limitKeys = [loginIpKey(ip), loginEmailKey(parsed.data.email)]
         const limits = limitKeys.map((key) => rateLimit(key, LOGIN_LIMIT))
         const refundAttempt = () => limitKeys.forEach(refundRateLimit)
         const blocked = limits.filter((limit) => !limit.ok)

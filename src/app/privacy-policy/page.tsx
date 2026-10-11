@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default async function PrivacyPolicyPage() {
   await connection()
-  const { operatorName, supportEmail, analytics, safeBrowsing, vercel } = getLegalInfo()
+  const { operatorName, supportEmail, analytics, safeBrowsing, captcha, vercel } = getLegalInfo()
   const support = <EmailLink email={supportEmail} />
   const signInProviders = enabledOAuthProviders().map((provider) => provider.name)
   const providerList = new Intl.ListFormat('en', { type: 'disjunction' }).format(signInProviders)
@@ -149,6 +149,22 @@ export default async function PrivacyPolicyPage() {
         </>
       )}
 
+      {captcha && (
+        <>
+          <h3>Cloudflare Turnstile</h3>
+          <p>
+            To keep bots away from registration, password reset and repeated failed sign-ins, these forms use Cloudflare
+            Turnstile, provided by Cloudflare, Inc. It checks your browser in the background and only rarely asks you to
+            click. For this, Cloudflare receives your IP address and technical details of your browser and device; we
+            receive only whether the check passed. Turnstile doesn’t use the data for advertising. See{' '}
+            <a href="https://www.cloudflare.com/turnstile-privacy-policy/" target="_blank" rel="noopener noreferrer">
+              Cloudflare’s Turnstile Privacy Addendum
+            </a>
+            .
+          </p>
+        </>
+      )}
+
       <h2>Why we process it</h2>
       <ul>
         <li>
@@ -157,6 +173,7 @@ export default async function PrivacyPolicyPage() {
         </li>
         <li>
           To keep the Service and the people who scan codes safe: server logs, rate limits,
+          {captcha && ' bot checks,'}
           {safeBrowsing && ' destination checks,'} handling abuse reports, and keeping records about codes and accounts
           disabled for abuse (our legitimate interests in security and in preventing abuse).
         </li>
@@ -178,6 +195,7 @@ export default async function PrivacyPolicyPage() {
         </li>
         <li>our database provider, which stores account and QR code data;</li>
         <li>our email provider, which delivers account emails;</li>
+        {captcha && <li>Cloudflare, Inc. (United States), for the bot check described above;</li>}
         {(analytics || safeBrowsing) && <li>Google, as described above.</li>}
         {signInProviders.length > 0 && (
           <li>

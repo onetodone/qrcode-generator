@@ -5,6 +5,7 @@ import { setHandoffCookie } from '@/lib/handoff-cookies'
 import { clientIpFromHeaders, hostnameFromHeaders } from '@/lib/request'
 import { enabledOAuthProviders } from '@/lib/oauth-providers'
 import { getAppHostname, getAppUrl, getShortLinkHostname } from '@/lib/app-url'
+import { CAPTCHA_ORIGIN, isCaptchaEnabled } from '@/lib/captcha'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password']
 // Open to guests and signed-in users alike; matched exactly. A signed-in
@@ -33,6 +34,9 @@ const cspConnectSrcExtra = process.env.CSP_CONNECT_SRC_EXTRA?.trim() ?? ''
 const cspFormActionExtra = enabledOAuthProviders()
   .map((provider) => ` ${provider.authorizeOrigin}`)
   .join('')
+// The Turnstile script is added by the app's own scripts ('strict-dynamic');
+// its challenge runs in a frame.
+const cspFrameSrc = isCaptchaEnabled() ? `'self' ${CAPTCHA_ORIGIN}` : "'self'"
 
 function buildCsp(nonce: string): string {
   return [
@@ -47,6 +51,7 @@ function buildCsp(nonce: string): string {
     "font-src 'self' data:",
     `connect-src 'self'${cspConnectSrcExtra ? ` ${cspConnectSrcExtra}` : ''}${isDev ? ' ws:' : ''}`,
     "worker-src 'self' blob:",
+    `frame-src ${cspFrameSrc}`,
   ].join('; ')
 }
 

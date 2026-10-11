@@ -4,13 +4,15 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { forgotPasswordAction } from '@/actions/auth'
 import type { FormState } from '@/lib/forms'
+import { Turnstile } from '@/components/turnstile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ captchaSiteKey }: { captchaSiteKey: string | null }) {
   const [email, setEmail] = useState('')
+  const [captchaReady, setCaptchaReady] = useState(false)
   const [state, action, pending] = useActionState<FormState, FormData>(forgotPasswordAction, undefined)
 
   if (state?.success) {
@@ -54,8 +56,16 @@ export function ForgotPasswordForm() {
                 />
               </FieldContent>
             </Field>
+            {captchaSiteKey && (
+              <Turnstile
+                siteKey={captchaSiteKey}
+                action="forgot-password"
+                resetKey={state}
+                onReadyChange={setCaptchaReady}
+              />
+            )}
             {state?.error && <FieldError>{state.error}</FieldError>}
-            <Button type="submit" disabled={pending} className="w-full">
+            <Button type="submit" disabled={pending || (captchaSiteKey !== null && !captchaReady)} className="w-full">
               {pending ? 'Sending...' : 'Send reset link'}
             </Button>
           </FieldGroup>
