@@ -6,7 +6,7 @@ import { sessionCookieState, signIn, signOut, unstable_update } from '@/auth'
 import { Prisma } from '@/generated/client'
 import { VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
-import { sendVerificationEmail } from '@/lib/verification'
+import { RESEND_COOLDOWN_MS, sendVerificationEmail } from '@/lib/verification'
 import { sendEmailChangeRequestedNotice } from '@/lib/account-emails'
 import { afterResponse } from '@/lib/after-response'
 import { changePasswordSchema, deleteAccountSchema, updateProfileSchema } from '@/schemas/profile'
@@ -23,6 +23,8 @@ import { RECENT_SIGN_IN_REQUIRED } from '@/lib/sign-in-errors'
 const NOT_SIGNED_IN = 'You must be signed in.'
 
 const CURRENT_PASSWORD_LIMIT = { limit: 5, windowMs: 15 * 60 * 1000 }
+const EMAIL_CHANGE_USER_LIMIT = { limit: 5, windowMs: 60 * 60 * 1000 }
+const EMAIL_CHANGE_ADDRESS_LIMIT = { limit: 1, windowMs: RESEND_COOLDOWN_MS }
 
 /**
  * Checks the signed-in user's current password. Failed checks are limited per
@@ -50,7 +52,10 @@ async function checkCurrentPassword(userId: string, password: string, hash: stri
  * Updates the signed-in user's name. A new email address needs the current
  * password; it is stored as pending and replaces the current one only after
  * its confirmation link is followed, and the current address is told about
- * the request. Nothing is saved when the link can't be emailed.
+ * the request. An address another account uses gets the same answer and the
+ * same email, so the form can't be used to probe for accounts; confirming
+ * such a change fails. Requests are limited per user and per address.
+ * Nothing is saved when the link can't be emailed.
  */
 export async function updateProfileAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
@@ -84,23 +89,30 @@ export async function updateProfileAction(_prevState: FormState, formData: FormD
     if (!parsed.data.currentPassword) {
       return { error: 'Enter your current password to change your email.' }
     }
-    // Checked before the lookup below, so probing addresses takes the password.
     const passwordError = await checkCurrentPassword(userId, parsed.data.currentPassword, currentUser.password)
     if (passwordError) return { error: passwordError }
 
-    const existing = await prisma.user.findFirst({
-      where: {
-        id: { not: userId },
-        OR: [{ email: parsed.data.email }, { pendingEmail: parsed.data.email }],
-      },
-    })
-    if (existing) {
-      return { error: 'An account with this email already exists.' }
+    // Counted per request, not per token: switching the pending address
+    // replaces its tokens, which would reset the resend cooldown.
+    const userKey = `email-change:user:${userId}`
+    const addressKey = `email-change:address:${parsed.data.email.toLowerCase()}`
+    const userLimit = rateLimit(userKey, EMAIL_CHANGE_USER_LIMIT)
+    const addressLimit = rateLimit(addressKey, EMAIL_CHANGE_ADDRESS_LIMIT)
+    if (!userLimit.ok || !addressLimit.ok) {
+      refundRateLimit(userKey)
+      refundRateLimit(addressKey)
+      const retryAfterMs = Math.max(
+        userLimit.ok ? 0 : userLimit.retryAfterMs,
+        addressLimit.ok ? 0 : addressLimit.retryAfterMs,
+      )
+      return { error: tooManyAttemptsMessage(retryAfterMs) }
     }
 
     try {
       noticeDue = await sendVerificationEmail(parsed.data.email, VerificationTokenType.EMAIL_CHANGE)
     } catch (error) {
+      refundRateLimit(userKey)
+      refundRateLimit(addressKey)
       logger.error('profile.email_change_email_failed', { error })
       return {
         error:
