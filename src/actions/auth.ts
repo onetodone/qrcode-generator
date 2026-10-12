@@ -5,6 +5,7 @@ import { AuthError } from 'next-auth'
 import {
   auth,
   clearLoginAttempts,
+  confirmEmailChange,
   AccountSuspendedSignin,
   CaptchaRequiredSignin,
   ConfirmationEmailFailedSignin,
@@ -14,6 +15,7 @@ import {
   sessionCookieState,
   signIn,
   signOut,
+  unstable_update,
   VerificationTokenInvalidSignin,
 } from '@/auth'
 import { VerificationTokenType } from '@/generated/client'
@@ -203,14 +205,16 @@ export async function registerAction(_prevState: FormState, formData: FormData):
 }
 
 /**
- * Confirms an email address from the `/confirm-email` page: a new account's
- * address together with the password it chooses, or the new address of an
- * email change. Signs in and redirects to `/qrcodes`. When the link turned
- * invalid or expired, the page is loaded again and explains it. Rate-limited
- * per IP.
+ * Confirms an email address from the `/confirm-email` page. A new account's
+ * address is confirmed together with the password it chooses, signs in and
+ * redirects to `/qrcodes`. An email change signs nobody in: the account's own
+ * session is refreshed and goes to `/qrcodes`, any other browser goes to
+ * `/email-changed`. When the link turned invalid or expired, the page is
+ * loaded again and explains it. Rate-limited per IP.
  */
 export async function confirmEmailAction(_prevState: FormState, formData: FormData): Promise<FormState> {
-  const confirm = rateLimit(`confirm-email:${await getClientIp()}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
+  const ip = await getClientIp()
+  const confirm = rateLimit(`confirm-email:${ip}`, { limit: 10, windowMs: FIFTEEN_MINUTES_MS })
   if (!confirm.ok) {
     return { error: tooManyAttemptsMessage(confirm.retryAfterMs) }
   }
@@ -227,10 +231,19 @@ export async function confirmEmailAction(_prevState: FormState, formData: FormDa
     return { error: firstZodError(parsed.error) }
   }
 
+  if (!('newPassword' in parsed.data)) {
+    const userId = await confirmEmailChange(parsed.data.token, ip)
+    if (!userId) redirect('/confirm-email')
+    if ((await auth())?.user?.id !== userId) redirect('/email-changed')
+    // The `jwt` callback reads the new address from the database.
+    await unstable_update({})
+    redirect('/qrcodes')
+  }
+
   try {
     await signIn('credentials', {
       verificationToken: parsed.data.token,
-      ...('newPassword' in parsed.data ? { password: parsed.data.newPassword } : {}),
+      password: parsed.data.newPassword,
       redirectTo: '/qrcodes',
     })
   } catch (error) {

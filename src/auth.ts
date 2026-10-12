@@ -1,12 +1,13 @@
 import NextAuth, { AuthError, CredentialsSignin, type Account, type Profile, type User } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { decode } from 'next-auth/jwt'
-import { cookies } from 'next/headers'
+import { headers } from 'next/headers'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import { Prisma, VerificationTokenType } from '@/generated/client'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail } from '@/lib/verification'
 import { sendEmailChangedNotice, sendProviderConnectedNotice } from '@/lib/account-emails'
+import { readSessionCookie } from '@/lib/session-cookie'
 import { afterResponse } from '@/lib/after-response'
 import { loginSchema } from '@/schemas/auth'
 import { passwordField } from '@/schemas/password'
@@ -96,34 +97,24 @@ function signInErrorUrl(code: string): string {
 
 const RECENT_SIGN_IN_MS = 10 * 60 * 1000
 
-const SESSION_COOKIE = /^((?:__Secure-)?authjs\.session-token)(?:\.(\d+))?$/
-
 /**
  * The request's session cookie, checked against the database now rather than
  * through the `jwt` callback, which trusts a session for up to 30 s: `none`
- * without one, `revoked` when it no longer counts, otherwise `recent` or
- * `stale` depending on whether its sign-in was within the last 10 minutes.
- * Connecting a provider and deleting an account without a password need a
- * `recent` one, so a stolen session can't turn into lasting access.
+ * without one, `revoked` when it no longer counts or Auth.js might read it
+ * differently, otherwise `recent` or `stale` depending on whether its sign-in
+ * was within the last 10 minutes. Connecting a provider and deleting an
+ * account without a password need a `recent` one, so a stolen session can't
+ * turn into lasting access.
  */
 export async function sessionCookieState(): Promise<'none' | 'revoked' | 'stale' | 'recent'> {
-  const chunks: { name: string; index: number; value: string }[] = []
-  for (const cookie of (await cookies()).getAll()) {
-    const match = SESSION_COOKIE.exec(cookie.name)
-    if (match?.[1]) chunks.push({ name: match[1], index: Number(match[2] ?? 0), value: cookie.value })
-  }
-  const salt = chunks[0]?.name
-  if (!salt) return 'none'
-
-  const value = chunks
-    .filter((chunk) => chunk.name === salt)
-    .sort((a, b) => a.index - b.index)
-    .map((chunk) => chunk.value)
-    .join('')
+  // Read from the raw header: `cookies()` parses it differently from Auth.js.
+  const cookie = readSessionCookie((await headers()).get('cookie'))
+  if (cookie === 'none') return 'none'
+  if (cookie === 'invalid') return 'revoked'
 
   let token
   try {
-    token = await decode({ token: value, secret: process.env.AUTH_SECRET ?? '', salt })
+    token = await decode({ token: cookie.value, secret: process.env.AUTH_SECRET ?? '', salt: cookie.name })
   } catch {
     return 'revoked'
   }
@@ -200,59 +191,63 @@ async function consumeToken(token: string): Promise<boolean> {
 }
 
 /**
- * Signs in from an email confirmation token. Confirming a new account's address
- * also sets its password; confirming an email change switches the address and
- * notifies the previous one.
+ * Signs in from a new account's confirmation token and sets the password it
+ * chooses. An email change token never signs in: `confirmEmailAction`
+ * confirms it without a session, so a link sent by someone else can't sign
+ * a browser into their account.
  */
-async function confirmEmail(token: string, password: unknown, request: Request): Promise<User> {
+async function confirmEmail(token: string, password: unknown): Promise<User> {
   const record = await prisma.verificationToken.findUnique({ where: { token } })
-  if (!record || record.expires < new Date()) throw new VerificationTokenInvalidSignin()
+  if (!record || record.expires < new Date() || record.type !== VerificationTokenType.EMAIL_VERIFY) {
+    throw new VerificationTokenInvalidSignin()
+  }
 
-  if (record.type === VerificationTokenType.EMAIL_VERIFY) {
-    // Whoever confirms the address chooses the password, so a password set by
-    // someone who registered the address first never signs in. For the same
-    // reason the confirmation page asks for agreement to the terms again.
-    const parsed = passwordField.safeParse(password)
-    if (!parsed.success) throw new VerificationTokenInvalidSignin()
-    const passwordHash = await hashPassword(parsed.data)
+  // Whoever confirms the address chooses the password, so a password set by
+  // someone who registered the address first never signs in. For the same
+  // reason the confirmation page asks for agreement to the terms again.
+  const parsed = passwordField.safeParse(password)
+  if (!parsed.success) throw new VerificationTokenInvalidSignin()
+  const passwordHash = await hashPassword(parsed.data)
 
-    if (!(await consumeToken(token))) throw new VerificationTokenInvalidSignin()
-    const user = await prisma.user.findUnique({ where: { email: record.identifier } })
-    if (!user || user.emailVerified) throw new VerificationTokenInvalidSignin()
+  if (!(await consumeToken(token))) throw new VerificationTokenInvalidSignin()
+  const user = await prisma.user.findUnique({ where: { email: record.identifier } })
+  if (!user || user.emailVerified) throw new VerificationTokenInvalidSignin()
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerified: new Date(), password: passwordHash, termsAcceptedAt: new Date() },
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerified: new Date(), password: passwordHash, termsAcceptedAt: new Date() },
+  })
+  return { id: user.id, email: user.email, name: user.name }
+}
+
+/**
+ * Switches an account to the address an email change token confirms and
+ * notifies the previous address. Signs nobody in. Returns the account's id,
+ * or `null` when the token is invalid, expired or used, or the address was
+ * taken while the change was pending.
+ */
+export async function confirmEmailChange(token: string, ip: string): Promise<string | null> {
+  const record = await prisma.verificationToken.findUnique({ where: { token } })
+  if (!record || record.expires < new Date() || record.type !== VerificationTokenType.EMAIL_CHANGE) return null
+  if (!(await consumeToken(token))) return null
+  const pendingUser = await prisma.user.findFirst({ where: { pendingEmail: record.identifier } })
+  if (!pendingUser) return null
+
+  let user
+  try {
+    user = await prisma.user.update({
+      where: { id: pendingUser.id },
+      data: { email: record.identifier, emailVerified: new Date(), pendingEmail: null },
     })
-    return { id: user.id, email: user.email, name: user.name }
+  } catch (error) {
+    // Someone else claimed this email address while the confirmation was pending.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null
+    throw error
   }
 
-  if (record.type === VerificationTokenType.EMAIL_CHANGE) {
-    if (!(await consumeToken(token))) throw new VerificationTokenInvalidSignin()
-    const pendingUser = await prisma.user.findFirst({ where: { pendingEmail: record.identifier } })
-    if (!pendingUser) throw new VerificationTokenInvalidSignin()
-
-    let user
-    try {
-      user = await prisma.user.update({
-        where: { id: pendingUser.id },
-        data: { email: record.identifier, emailVerified: new Date(), pendingEmail: null },
-      })
-    } catch (error) {
-      // Someone else claimed this email address while the confirmation was pending.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new VerificationTokenInvalidSignin()
-      }
-      throw error
-    }
-
-    const newEmail = user.email
-    const ip = clientIpFromHeaders(request.headers)
-    afterResponse('auth.email_changed_notice_failed', () => sendEmailChangedNotice(pendingUser, newEmail, ip))
-    return { id: user.id, email: user.email, name: user.name }
-  }
-
-  throw new VerificationTokenInvalidSignin()
+  const newEmail = user.email
+  afterResponse('auth.email_changed_notice_failed', () => sendEmailChangedNotice(pendingUser, newEmail, ip))
+  return user.id
 }
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
@@ -281,7 +276,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       },
       authorize: async (credentials, request) => {
         if (typeof credentials?.verificationToken === 'string') {
-          return confirmEmail(credentials.verificationToken, credentials.password, request)
+          return confirmEmail(credentials.verificationToken, credentials.password)
         }
 
         const parsed = loginSchema.safeParse(credentials)
@@ -355,7 +350,19 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       if (!account || account.type === 'credentials') return true
       return authorizeProviderSignIn(user, account, profile)
     },
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, account, profile, trigger }) {
+      // `signIn` decides from its own reading of the session cookie; should
+      // Auth.js read it differently and create an account, it still needs an
+      // address the provider has verified.
+      if (trigger === 'signUp' && account && account.type !== 'credentials') {
+        const provider = findOAuthProvider(account.provider)
+        if (!provider || !profile || !provider.hasVerifiedEmail(profile)) {
+          logger.warn('auth.unverified_sign_up_rejected', { provider: account.provider })
+          await prisma.user.delete({ where: { id: user.id as string } })
+          return null
+        }
+      }
+
       if (user) {
         // Just signed in; the checks below start from the database state.
         const userId = user.id as string

@@ -16,6 +16,7 @@ const publicRoutes = [
   '/confirm-email',
   '/reset-password',
   '/password-updated',
+  '/email-changed',
   '/terms-of-use',
   '/privacy-policy',
   '/account-deleted',
