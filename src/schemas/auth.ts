@@ -1,21 +1,27 @@
 import * as z from 'zod'
 import { confirmPasswordField, passwordField, passwordsMatch, passwordsMatchError } from '@/schemas/password'
 
+/**
+ * An email address, trimmed and lowercased: accounts, tokens and limits all
+ * key on this one form, so letter case never makes a second address.
+ */
+export const emailField = z.email({ error: 'Please enter a valid email address.' }).trim().toLowerCase()
+
 /** Registration form: name, email and agreement to the terms. The password is chosen when the email is confirmed. */
 export const registerSchema = z.object({
   name: z.string().min(2, { error: 'Name must be at least 2 characters.' }).max(100).trim(),
-  email: z.email({ error: 'Please enter a valid email address.' }).trim(),
+  email: emailField,
   acceptTerms: z.literal('on', { error: 'Please agree to the Terms of Use to create an account.' }),
 })
 
 /** Sign-in form: email and password. */
 export const loginSchema = z.object({
-  email: z.email({ error: 'Please enter a valid email address.' }).trim(),
+  email: emailField,
   password: z.string().min(1, { error: 'Password is required.' }),
 })
 
-/** A single email address, trimmed. */
-export const emailSchema = z.email({ error: 'Please enter a valid email address.' }).trim()
+/** A single email address, trimmed and lowercased. */
+export const emailSchema = emailField
 
 /** Reset-password form: token plus the new password entered twice. */
 export const resetPasswordSchema = z

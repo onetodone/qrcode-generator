@@ -1,10 +1,11 @@
 import * as z from 'zod'
+import { emailField } from '@/schemas/auth'
 import { confirmPasswordField, passwordField, passwordsMatch, passwordsMatchError } from '@/schemas/password'
 
 /** Profile form: name and email, plus the current password, which a change of email requires. */
 export const updateProfileSchema = z.object({
   name: z.string().min(2, { error: 'Name must be at least 2 characters.' }).max(100).trim(),
-  email: z.email({ error: 'Please enter a valid email address.' }).trim(),
+  email: emailField,
   currentPassword: z.string().optional(),
 })
 

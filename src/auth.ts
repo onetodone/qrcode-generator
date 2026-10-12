@@ -164,13 +164,9 @@ async function authorizeProviderSignIn(
     return signInErrorUrl(ProviderSignInError.EmailNotVerified)
   }
 
-  // Auth.js looks the address up exactly; this object is the one it then
-  // uses, so an existing account in any letter case is found.
-  const existing = await prisma.user.findFirst({
-    where: { email: { equals: user.email, mode: 'insensitive' } },
-    select: { email: true },
-  })
-  user.email = existing?.email ?? user.email.toLowerCase()
+  // Auth.js looks the address up exactly and then uses this object, so it
+  // must be in the stored (lowercase) form.
+  user.email = user.email.toLowerCase()
 
   // A registration nobody confirmed only holds the address; the provider has
   // just shown that it belongs to this user.
