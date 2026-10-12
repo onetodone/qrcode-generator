@@ -26,8 +26,8 @@ async function findConfirmation(token: string) {
   }
 
   if (record?.type === VerificationTokenType.EMAIL_CHANGE) {
-    const user = await prisma.user.findFirst({ where: { pendingEmail: record.identifier }, select: { id: true } })
-    return user ? record : null
+    const pending = await prisma.user.count({ where: { pendingEmail: record.identifier } })
+    return pending === 1 ? record : null
   }
 
   return null

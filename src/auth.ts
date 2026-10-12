@@ -223,15 +223,18 @@ async function confirmEmail(token: string, password: unknown): Promise<User> {
 /**
  * Switches an account to the address an email change token confirms and
  * notifies the previous address. Signs nobody in. Returns the account's id,
- * or `null` when the token is invalid, expired or used, or the address was
- * taken while the change was pending.
+ * or `null` when the token is invalid, expired or used, the address is
+ * pending for more than one account, or another account uses it.
  */
 export async function confirmEmailChange(token: string, ip: string): Promise<string | null> {
   const record = await prisma.verificationToken.findUnique({ where: { token } })
   if (!record || record.expires < new Date() || record.type !== VerificationTokenType.EMAIL_CHANGE) return null
   if (!(await consumeToken(token))) return null
-  const pendingUser = await prisma.user.findFirst({ where: { pendingEmail: record.identifier } })
-  if (!pendingUser) return null
+  // A token doesn't name its account, so an address pending for several
+  // accounts confirms none of them.
+  const pendingUsers = await prisma.user.findMany({ where: { pendingEmail: record.identifier }, take: 2 })
+  const [pendingUser] = pendingUsers
+  if (!pendingUser || pendingUsers.length > 1) return null
 
   let user
   try {
@@ -240,7 +243,7 @@ export async function confirmEmailChange(token: string, ip: string): Promise<str
       data: { email: record.identifier, emailVerified: new Date(), pendingEmail: null },
     })
   } catch (error) {
-    // Someone else claimed this email address while the confirmation was pending.
+    // Another account uses this email address.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null
     throw error
   }
