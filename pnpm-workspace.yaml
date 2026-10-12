@@ -8,7 +8,7 @@ overrides:
   fast-uri: ^3.1.8
   mysql2: ^3.23.1
 minimumReleaseAgeExclude:
-  - zod@4.6.5
+  - zod@4.6.5 || 4.6.6
   - '@next/env@16.3.8'
   - '@next/eslint-plugin-next@16.3.8'
   - '@next/swc-darwin-arm64@16.3.8'
@@ -29,4 +29,4 @@ minimumReleaseAgeExclude:
   - pg-connection-string@2.14.1
   - pg-protocol@1.16.1
   - pg@8.23.1
-  - '@onetodone/mailer@0.2.3 || 0.2.4'
+  - '@onetodone/mailer@0.2.3 || 0.2.4 || 0.3.1'
