@@ -77,9 +77,9 @@ function saveRateLimitError(userId: string): string | null {
 
 // Counted in the database rather than the in-memory limiter, so the cap holds
 // across serverless instances.
-async function dailyCreateLimitError(userId: string): Promise<string | null> {
+async function dailyCreateLimitError(db: Pick<typeof prisma, 'qrCode'>, userId: string): Promise<string | null> {
   const now = Date.now()
-  const recent = await prisma.qrCode.findMany({
+  const recent = await db.qrCode.findMany({
     where: { userId, createdAt: { gt: new Date(now - 24 * HOUR_MS) } },
     select: { createdAt: true },
     orderBy: { createdAt: 'desc' },
@@ -90,6 +90,30 @@ async function dailyCreateLimitError(userId: string): Promise<string | null> {
 
   const hours = Math.max(1, Math.ceil((oldest.createdAt.getTime() + 24 * HOUR_MS - now) / HOUR_MS))
   return `You can create up to ${DAILY_CREATE_LIMIT} QR codes per 24 hours. Please try again in about ${hours} hour${hours === 1 ? '' : 's'}.`
+}
+
+// The per-user lock makes the count and the insert one step, so parallel
+// requests can't all see room under the limit. A hash collision aborts the
+// transaction, so each attempt runs in its own.
+async function createWithinDailyLimit(
+  userId: string,
+  data: Omit<Prisma.QrCodeUncheckedCreateInput, 'userId' | 'urlHash'>,
+): Promise<string | null> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`qr-create:${userId}`}))`
+        const limitError = await dailyCreateLimitError(tx, userId)
+        if (limitError) return limitError
+
+        await tx.qrCode.create({ data: { ...data, userId, urlHash: generateUrlHash() } })
+        return null
+      })
+    } catch (error) {
+      const isHashCollision = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+      if (!isHashCollision || attempt >= MAX_HASH_ATTEMPTS) throw error
+    }
+  }
 }
 
 /** Creates a QR code for the signed-in user with a unique redirect hash. */
@@ -105,8 +129,9 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
   if ('error' in result) return { error: result.error }
   const { leadsTo, note, shape, fgColor, bgColor } = result.data
 
-  const limitError = await dailyCreateLimitError(userId)
-  if (limitError) return { error: limitError }
+  // Checked again under the lock; this one spares a Safe Browsing lookup.
+  const earlyLimitError = await dailyCreateLimitError(prisma, userId)
+  if (earlyLimitError) return { error: earlyLimitError }
 
   const verdict = await checkDestination(leadsTo)
   if (verdict.status === 'unsafe') {
@@ -115,18 +140,15 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
   }
   const destinationCheckedAt = verdict.status === 'safe' ? new Date() : null
 
-  for (let attempt = 1; attempt <= MAX_HASH_ATTEMPTS; attempt++) {
-    try {
-      await prisma.qrCode.create({
-        data: { userId, urlHash: generateUrlHash(), note, leadsTo, shape, fgColor, bgColor, destinationCheckedAt },
-      })
-      break
-    } catch (error) {
-      const isHashCollision = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
-      if (isHashCollision && attempt < MAX_HASH_ATTEMPTS) continue
-      throw error
-    }
-  }
+  const limitError = await createWithinDailyLimit(userId, {
+    note,
+    leadsTo,
+    shape,
+    fgColor,
+    bgColor,
+    destinationCheckedAt,
+  })
+  if (limitError) return { error: limitError }
 
   revalidatePath('/qrcodes')
   return { success: true }

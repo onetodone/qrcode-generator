@@ -73,7 +73,13 @@ export default auth((req) => {
 
   let response: NextResponse
   if (shortLinkOnlyHostname && hostnameFromHeaders(req.headers) === shortLinkOnlyHostname) {
-    response = NextResponse.redirect(new URL(nextUrl.pathname + nextUrl.search, getAppUrl()))
+    // A path like `//host/x` must stay a path: resolved against APP_URL, or
+    // relativized by Next.js, it would name another host.
+    const target = new URL(getAppUrl())
+    target.pathname = nextUrl.pathname
+    target.pathname = target.pathname.replace(/^\/{2,}/, '/')
+    target.search = nextUrl.search
+    response = NextResponse.redirect(target)
   } else if (!isLoggedIn && !isPublicOnlyRoute && !isPublicRoute) {
     response = NextResponse.redirect(new URL('/login', nextUrl))
   } else if (isLoggedIn && isPublicOnlyRoute) {
