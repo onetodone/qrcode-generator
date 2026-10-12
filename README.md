@@ -24,7 +24,8 @@ deployed.
   password is chosen when the email address is confirmed, and an email change
   needs the current password and is announced to the old address. Confirming
   an email change signs nobody in: the account's own session picks up the new
-  address, any other browser is asked to sign in.
+  address, any other browser is asked to sign in. Email addresses are stored
+  in lowercase, so letter case never makes a second account.
 - **Sign-in providers** — optional sign-up and sign-in with Google, GitHub,
   Microsoft, Facebook, Discord, GitLab or LinkedIn; each one turns on when its
   credentials are set. See [Sign-in providers](#sign-in-providers).
