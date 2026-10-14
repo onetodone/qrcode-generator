@@ -11,14 +11,11 @@ beforeEach(() => {
   vi.stubEnv('TURNSTILE_SITE_KEY', 'site-key')
   vi.stubEnv('TURNSTILE_SECRET_KEY', 'secret-key')
   vi.stubGlobal('fetch', fetchMock)
-  vi.spyOn(console, 'warn').mockImplementation(() => {})
-  vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
-  vi.restoreAllMocks()
   fetchMock.mockReset()
 })
 
@@ -45,12 +42,12 @@ describe('verifyCaptcha', () => {
   })
 
   test('sends the secret, the token and a known IP', async () => {
-    fetchMock.mockResolvedValue(siteverify({ success: true, action: 'register' }))
+    fetchMock.mockImplementation(async () => siteverify({ success: true, action: 'register' }))
     expect(await verifyCaptcha('token', 'register', '1.2.3.4')).toBe('ok')
     const body = fetchMock.mock.calls[0]?.[1]?.body as URLSearchParams
     expect(Object.fromEntries(body)).toEqual({ secret: 'secret-key', response: 'token', remoteip: '1.2.3.4' })
 
-    await verifyCaptcha('token', 'register', 'unknown')
+    expect(await verifyCaptcha('token', 'register', 'unknown')).toBe('ok')
     expect((fetchMock.mock.calls[1]?.[1]?.body as URLSearchParams).has('remoteip')).toBe(false)
   })
 

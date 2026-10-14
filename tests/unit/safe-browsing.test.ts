@@ -11,13 +11,11 @@ const fetchMock = vi.fn<typeof fetch>()
 beforeEach(() => {
   vi.stubEnv('SAFE_BROWSING_API_KEY', 'key')
   vi.stubGlobal('fetch', fetchMock)
-  vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
-  vi.restoreAllMocks()
   fetchMock.mockReset()
 })
 
