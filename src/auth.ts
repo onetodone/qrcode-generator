@@ -1,4 +1,11 @@
-import NextAuth, { AuthError, CredentialsSignin, type Account, type Profile, type User } from 'next-auth'
+import NextAuth, {
+  AuthError,
+  CredentialsSignin,
+  type Account,
+  type NextAuthConfig,
+  type Profile,
+  type User,
+} from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { decode } from 'next-auth/jwt'
 import { headers } from 'next/headers'
@@ -137,7 +144,7 @@ export async function sessionCookieState(): Promise<'none' | 'revoked' | 'stale'
  * an address that already has an account is refused by Auth.js unless that
  * account was never confirmed.
  */
-async function authorizeProviderSignIn(
+export async function authorizeProviderSignIn(
   user: User,
   account: Account,
   profile: Profile | undefined,
@@ -249,6 +256,79 @@ export async function confirmEmailChange(token: string, ip: string): Promise<str
   return user.id
 }
 
+/**
+ * Auth.js callbacks: provider sign-ins go through `authorizeProviderSignIn`,
+ * and every session token is checked against the database (account deleted
+ * or suspended, password changed since it was issued) at most every 30 s.
+ */
+export const authCallbacks = {
+  async signIn({ user, account, profile }) {
+    if (!account || account.type === 'credentials') return true
+    return authorizeProviderSignIn(user, account, profile)
+  },
+  async jwt({ token, user, account, profile, trigger }) {
+    // `signIn` decides from its own reading of the session cookie; should
+    // Auth.js read it differently and create an account, it still needs an
+    // address the provider has verified.
+    if (trigger === 'signUp' && account && account.type !== 'credentials') {
+      const provider = findOAuthProvider(account.provider)
+      if (!provider || !profile || !provider.hasVerifiedEmail(profile)) {
+        logger.warn('auth.unverified_sign_up_rejected', { provider: account.provider })
+        await prisma.user.delete({ where: { id: user.id as string } })
+        return null
+      }
+    }
+
+    if (user) {
+      // Just signed in; the checks below start from the database state.
+      const userId = user.id as string
+      token.id = userId
+      const changedAt = await activePasswordChangedAtMs(userId)
+      if (changedAt === null) return null
+      token.passwordChangedAt = changedAt
+      token.checkedAt = Date.now()
+      token.signedInAt = Date.now()
+      return token
+    }
+
+    if (typeof token.id !== 'string') return token
+    const userId = token.id
+    const issuedFor = typeof token.passwordChangedAt === 'number' ? token.passwordChangedAt : 0
+
+    // `POST /api/auth/session` triggers an update too, so its payload is
+    // client-controlled: everything comes from the database instead, and a
+    // revoked session stays revoked.
+    if (trigger === 'update') {
+      const record = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true, passwordChangedAt: true, suspendedAt: true },
+      })
+      if (!record || record.suspendedAt) return null
+      if ((record.passwordChangedAt?.getTime() ?? 0) > issuedFor) return null
+      token.name = record.name
+      token.email = record.email
+      token.checkedAt = Date.now()
+      return token
+    }
+
+    const checkedAt = typeof token.checkedAt === 'number' ? token.checkedAt : 0
+    if (Date.now() - checkedAt < SESSION_REVALIDATE_MS) return token
+
+    const changedAt = await activePasswordChangedAtMs(userId)
+    if (changedAt === null) return null
+    if (changedAt > issuedFor) return null
+    token.checkedAt = Date.now()
+
+    return token
+  },
+  async session({ session, token }) {
+    if (session.user && token.id) {
+      session.user.id = token.id as string
+    }
+    return session
+  },
+} satisfies NextAuthConfig['callbacks']
+
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   adapter: PrismaAdapter(prisma),
   // Credentials-based auth only supports JWT sessions, not database sessions.
@@ -344,71 +424,5 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       )
     },
   },
-  callbacks: {
-    async signIn({ user, account, profile }) {
-      if (!account || account.type === 'credentials') return true
-      return authorizeProviderSignIn(user, account, profile)
-    },
-    async jwt({ token, user, account, profile, trigger }) {
-      // `signIn` decides from its own reading of the session cookie; should
-      // Auth.js read it differently and create an account, it still needs an
-      // address the provider has verified.
-      if (trigger === 'signUp' && account && account.type !== 'credentials') {
-        const provider = findOAuthProvider(account.provider)
-        if (!provider || !profile || !provider.hasVerifiedEmail(profile)) {
-          logger.warn('auth.unverified_sign_up_rejected', { provider: account.provider })
-          await prisma.user.delete({ where: { id: user.id as string } })
-          return null
-        }
-      }
-
-      if (user) {
-        // Just signed in; the checks below start from the database state.
-        const userId = user.id as string
-        token.id = userId
-        const changedAt = await activePasswordChangedAtMs(userId)
-        if (changedAt === null) return null
-        token.passwordChangedAt = changedAt
-        token.checkedAt = Date.now()
-        token.signedInAt = Date.now()
-        return token
-      }
-
-      if (typeof token.id !== 'string') return token
-      const userId = token.id
-      const issuedFor = typeof token.passwordChangedAt === 'number' ? token.passwordChangedAt : 0
-
-      // `POST /api/auth/session` triggers an update too, so its payload is
-      // client-controlled: everything comes from the database instead, and a
-      // revoked session stays revoked.
-      if (trigger === 'update') {
-        const record = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { name: true, email: true, passwordChangedAt: true, suspendedAt: true },
-        })
-        if (!record || record.suspendedAt) return null
-        if ((record.passwordChangedAt?.getTime() ?? 0) > issuedFor) return null
-        token.name = record.name
-        token.email = record.email
-        token.checkedAt = Date.now()
-        return token
-      }
-
-      const checkedAt = typeof token.checkedAt === 'number' ? token.checkedAt : 0
-      if (Date.now() - checkedAt < SESSION_REVALIDATE_MS) return token
-
-      const changedAt = await activePasswordChangedAtMs(userId)
-      if (changedAt === null) return null
-      if (changedAt > issuedFor) return null
-      token.checkedAt = Date.now()
-
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = token.id as string
-      }
-      return session
-    },
-  },
+  callbacks: authCallbacks,
 })

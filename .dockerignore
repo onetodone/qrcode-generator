@@ -11,3 +11,6 @@ npm-debug.log*
 pnpm-debug.log*
 
 prisma/generated
+
+tests
+vitest.config.mts

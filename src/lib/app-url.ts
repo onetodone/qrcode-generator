@@ -43,6 +43,20 @@ export function getConfiguredShortLinkUrl(): string | null {
   return readUrl('SHORT_LINK_URL') ?? readUrl('APP_URL')
 }
 
+/**
+ * `APP_URL` with the path and query of a request that reached the short-link
+ * host. Leading slashes collapse to one, so a path like `//host/x` stays a
+ * path: resolved against `APP_URL`, or relativized by Next.js, it would name
+ * another host. Throws when `APP_URL` is unset.
+ */
+export function appUrlForPath(pathname: string, search: string): URL {
+  const target = new URL(getAppUrl())
+  target.pathname = pathname
+  target.pathname = target.pathname.replace(/^\/{2,}/, '/')
+  target.search = search
+  return target
+}
+
 /** Hostname of `APP_URL`, or null when unset or invalid. */
 export function getAppHostname(): string | null {
   return hostnameOf(readUrl('APP_URL'))
