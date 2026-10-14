@@ -53,6 +53,7 @@ deployed.
 - [Zod](https://zod.dev) for validation
 - [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) for the QR matrix, rendered to a custom SVG
 - [@onetodone/mailer](https://github.com/onetodone/mailer) for transactional email, sent over SMTP with [Nodemailer](https://nodemailer.com)
+- [Vitest](https://vitest.dev) for unit and integration tests
 
 ## Getting started
 
@@ -330,16 +331,40 @@ to your jurisdiction and providers, before running a public instance.
 | `pnpm lint:ci`       | Run ESLint without autofix (as CI does).          |
 | `pnpm typecheck`     | Type-check without emitting output.               |
 | `pnpm format`        | Format the codebase with Prettier.                |
+| `pnpm test`          | Run all tests (see [Tests](#tests)).              |
+| `pnpm test:unit`     | Run the unit tests only; no database needed.      |
+| `pnpm test:integration` | Run the integration tests against PostgreSQL.  |
 | `pnpm qr:disable`    | Disable a QR code by hand (see [Unsafe destinations](#unsafe-destinations)). |
 | `pnpm qr:enable`     | Lift a manual disable.                            |
 | `pnpm user:suspend`  | Suspend an account (see [Account suspension](#account-suspension)). |
 | `pnpm user:unsuspend` | Lift a suspension. |
+
+## Tests
+
+Unit tests (`tests/unit/`) cover pure logic: validation schemas, destination
+parsing, the session cookie reader, rate limiting, log masking. Integration
+tests (`tests/integration/`) run the Server Actions, Auth.js sign-in and the
+`/s/<hash>` route against a real PostgreSQL database, with email, Safe Browsing
+and Turnstile replaced by test doubles, so nothing leaves the machine.
+
+Integration tests need a database whose name ends in `_test`, since they empty
+every table: `TEST_DATABASE_URL`, or by default the database of `DATABASE_URL`
+with `_test` appended (`qrcode_generator` → `qrcode_generator_test`). Pending
+migrations are applied to it before the run, and Prisma creates it if it
+doesn't exist.
+
+```bash
+pnpm test
+```
+
+CI runs the tests on every pull request and push to `main`.
 
 ## Project structure
 
 ```
 prisma/               Schema, migrations, seed script, generated Prisma client
 scripts/              Operator scripts (QR moderation and account suspension)
+tests/                Unit and integration tests
 src/app/               Routes (App Router)
 src/actions/           Server Actions
 src/schemas/           Zod validation schemas
