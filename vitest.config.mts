@@ -43,6 +43,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['tests/unit/**/*.test.ts'],
+          setupFiles: ['tests/unit/setup.ts'],
           env: sharedEnv,
         },
       },
