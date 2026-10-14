@@ -4,7 +4,7 @@ import { logRequest } from '@/lib/logger'
 import { setHandoffCookie } from '@/lib/handoff-cookies'
 import { clientIpFromHeaders, hostnameFromHeaders } from '@/lib/request'
 import { enabledOAuthProviders } from '@/lib/oauth-providers'
-import { getAppHostname, getAppUrl, getShortLinkHostname } from '@/lib/app-url'
+import { appUrlForPath, getAppHostname, getShortLinkHostname } from '@/lib/app-url'
 import { CAPTCHA_ORIGIN, isCaptchaEnabled } from '@/lib/captcha'
 
 const publicOnlyRoutes = ['/login', '/register', '/verify-email', '/forgot-password']
@@ -73,13 +73,7 @@ export default auth((req) => {
 
   let response: NextResponse
   if (shortLinkOnlyHostname && hostnameFromHeaders(req.headers) === shortLinkOnlyHostname) {
-    // A path like `//host/x` must stay a path: resolved against APP_URL, or
-    // relativized by Next.js, it would name another host.
-    const target = new URL(getAppUrl())
-    target.pathname = nextUrl.pathname
-    target.pathname = target.pathname.replace(/^\/{2,}/, '/')
-    target.search = nextUrl.search
-    response = NextResponse.redirect(target)
+    response = NextResponse.redirect(appUrlForPath(nextUrl.pathname, nextUrl.search))
   } else if (!isLoggedIn && !isPublicOnlyRoute && !isPublicRoute) {
     response = NextResponse.redirect(new URL('/login', nextUrl))
   } else if (isLoggedIn && isPublicOnlyRoute) {
