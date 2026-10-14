@@ -1,11 +1,17 @@
 import * as z from 'zod'
 import { confirmPasswordField, passwordField, passwordsMatch, passwordsMatchError } from '@/schemas/password'
 
+const INVALID_EMAIL = 'Please enter a valid email address.'
+
 /**
  * An email address, trimmed and lowercased: accounts, tokens and limits all
  * key on this one form, so letter case never makes a second address.
  */
-export const emailField = z.email({ error: 'Please enter a valid email address.' }).trim().toLowerCase()
+export const emailField = z
+  .string({ error: INVALID_EMAIL })
+  .trim()
+  .toLowerCase()
+  .pipe(z.email({ error: INVALID_EMAIL }))
 
 /** Registration form: name, email and agreement to the terms. The password is chosen when the email is confirmed. */
 export const registerSchema = z.object({
