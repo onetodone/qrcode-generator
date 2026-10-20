@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { Prisma, QrDisabledReason } from '@/generated/client'
+import { Prisma, QrDisabledReason, QrKind } from '@/generated/client'
 import { qrCodeFormSchema, type QrCodeFormInput } from '@/schemas/qrcode'
 import {
   generateUrlHash,
@@ -28,6 +28,8 @@ const SAVE_RATE_LIMIT = { limit: 30, windowMs: HOUR_MS }
 
 const NOT_SIGNED_IN = 'You must be signed in.'
 const UNSAFE_DESTINATION = 'This destination is flagged as unsafe, so it can’t be used.'
+const DIRECT_DESTINATION_LOCKED =
+  'The endpoint of a direct QR code is part of its image, so it can’t be changed. Create a new QR code instead.'
 
 async function isAccountSuspended(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { suspendedAt: true } })
@@ -38,8 +40,15 @@ function isRecordNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
 }
 
-async function parseQrCodeForm(formData: FormData): Promise<{ data: QrCodeFormInput } | { error: string }> {
+// With `lockedLeadsTo`, the endpoint must be submitted unchanged and isn't
+// validated again: rules added later mustn't block edits to a code whose
+// endpoint can't be changed anyway.
+async function parseQrCodeForm(
+  formData: FormData,
+  lockedLeadsTo?: string,
+): Promise<{ data: QrCodeFormInput } | { error: string }> {
   const parsed = qrCodeFormSchema.safeParse({
+    kind: formData.get('kind') ?? undefined,
     leadsTo: formData.get('leadsTo'),
     note: formData.get('note'),
     shape: formData.get('shape') ?? undefined,
@@ -48,6 +57,11 @@ async function parseQrCodeForm(formData: FormData): Promise<{ data: QrCodeFormIn
   })
   if (!parsed.success) {
     return { error: firstZodError(parsed.error) }
+  }
+
+  if (lockedLeadsTo !== undefined) {
+    if (parsed.data.leadsTo !== lockedLeadsTo) return { error: DIRECT_DESTINATION_LOCKED }
+    return { data: parsed.data }
   }
 
   const leadsTo = normalizeLeadsTo(parsed.data.leadsTo)
@@ -94,11 +108,12 @@ async function dailyCreateLimitError(db: Pick<typeof prisma, 'qrCode'>, userId: 
 
 // The per-user lock makes the count and the insert one step, so parallel
 // requests can't all see room under the limit. A hash collision aborts the
-// transaction, so each attempt runs in its own.
+// transaction, so each attempt runs in its own. Direct codes get no hash.
 async function createWithinDailyLimit(
   userId: string,
   data: Omit<Prisma.QrCodeUncheckedCreateInput, 'userId' | 'urlHash'>,
 ): Promise<string | null> {
+  const isDynamic = (data.kind ?? QrKind.DYNAMIC) === QrKind.DYNAMIC
   for (let attempt = 1; ; attempt++) {
     try {
       return await prisma.$transaction(async (tx) => {
@@ -106,7 +121,7 @@ async function createWithinDailyLimit(
         const limitError = await dailyCreateLimitError(tx, userId)
         if (limitError) return limitError
 
-        await tx.qrCode.create({ data: { ...data, userId, urlHash: generateUrlHash() } })
+        await tx.qrCode.create({ data: { ...data, userId, urlHash: isDynamic ? generateUrlHash() : null } })
         return null
       })
     } catch (error) {
@@ -116,7 +131,10 @@ async function createWithinDailyLimit(
   }
 }
 
-/** Creates a QR code for the signed-in user with a unique redirect hash. */
+/**
+ * Creates a QR code for the signed-in user: a dynamic code with a unique
+ * redirect hash, or a direct code whose image encodes the endpoint itself.
+ */
 export async function createQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
   if (!userId) return { error: NOT_SIGNED_IN }
@@ -127,7 +145,7 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
 
   const result = await parseQrCodeForm(formData)
   if ('error' in result) return { error: result.error }
-  const { leadsTo, note, shape, fgColor, bgColor } = result.data
+  const { kind, leadsTo, note, shape, fgColor, bgColor } = result.data
 
   // Checked again under the lock; this one spares a Safe Browsing lookup.
   const earlyLimitError = await dailyCreateLimitError(prisma, userId)
@@ -141,6 +159,7 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
   const destinationCheckedAt = verdict.status === 'safe' ? new Date() : null
 
   const limitError = await createWithinDailyLimit(userId, {
+    kind,
     note,
     leadsTo,
     shape,
@@ -155,10 +174,11 @@ export async function createQrCodeAction(_prevState: FormState, formData: FormDa
 }
 
 /**
- * Updates a QR code's endpoint, note and design. The redirect hash never
- * changes, so printed codes keep resolving. A new endpoint, or any save of a
- * code disabled for an unsafe destination, is checked with Safe Browsing; a
- * clean result enables such a code again. Manual disables stay.
+ * Updates a QR code's endpoint, note and design. The redirect hash and the
+ * kind never change, so printed codes keep resolving, and a direct code's
+ * endpoint can't change either. A new endpoint, or any save of a code disabled
+ * for an unsafe destination, is checked with Safe Browsing; a clean result
+ * enables such a code again. Manual disables stay.
  */
 export async function updateQrCodeAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const userId = await getSessionUserId()
@@ -173,15 +193,15 @@ export async function updateQrCodeAction(_prevState: FormState, formData: FormDa
   const rateLimitError = saveRateLimitError(userId)
   if (rateLimitError) return { error: rateLimitError }
 
-  const result = await parseQrCodeForm(formData)
-  if ('error' in result) return { error: result.error }
-  const { leadsTo, note, shape, fgColor, bgColor } = result.data
-
   const current = await prisma.qrCode.findFirst({
     where: { id, userId },
-    select: { leadsTo: true, disabledReason: true },
+    select: { kind: true, leadsTo: true, disabledReason: true },
   })
   if (!current) return { error: 'QR code not found.' }
+
+  const result = await parseQrCodeForm(formData, current.kind === QrKind.DIRECT ? current.leadsTo : undefined)
+  if ('error' in result) return { error: result.error }
+  const { leadsTo, note, shape, fgColor, bgColor } = result.data
 
   const data: Prisma.QrCodeUpdateInput = { leadsTo, note, shape, fgColor, bgColor }
   const destinationChanged = leadsTo !== current.leadsTo
@@ -213,7 +233,7 @@ export async function updateQrCodeAction(_prevState: FormState, formData: FormDa
       data,
       select: { urlHash: true },
     })
-    invalidateRedirect(urlHash)
+    if (urlHash) invalidateRedirect(urlHash)
   } catch (error) {
     if (isRecordNotFound(error)) return { error: 'QR code not found.' }
     throw error
@@ -233,7 +253,7 @@ export async function deleteQrCodeAction(id: unknown): Promise<void> {
 
   try {
     const { urlHash } = await prisma.qrCode.delete({ where: { id, userId }, select: { urlHash: true } })
-    invalidateRedirect(urlHash)
+    if (urlHash) invalidateRedirect(urlHash)
   } catch (error) {
     if (!isRecordNotFound(error)) throw error
   }

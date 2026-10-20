@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { PlusIcon } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { getShortLinkBaseUrl } from '@/lib/request'
+import { qrCodeContent } from '@/lib/qrcode'
 import { requireUserId } from '@/lib/auth-guard'
 import { Button } from '@/components/ui/button'
 import { PageContainer, PageHeader } from '@/components/page-header'
@@ -22,7 +23,7 @@ export default async function DashboardPage() {
 
   const rows = qrCodes.map((qrCode) => ({
     ...qrCode,
-    redirectUrl: `${baseUrl}/s/${qrCode.urlHash}`,
+    qrContent: qrCodeContent(qrCode, baseUrl),
   }))
 
   return (

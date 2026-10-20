@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { createQrCodeAction, deleteQrCodeAction, updateQrCodeAction } from '@/actions/qrcode'
 import { prisma } from '@/lib/prisma'
 import { getCachedRedirect, redirectCacheGeneration, setCachedRedirect } from '@/lib/redirect-cache'
-import { createQrCode, createUser } from './helpers/db'
+import { createDirectQrCode, createQrCode, createUser } from './helpers/db'
 import { form } from './helpers/navigation'
 import { signInAs } from './helpers/request'
 import { safeBrowsingResponse } from '../helpers/safe-browsing'
@@ -94,6 +94,37 @@ describe('creating a QR code', () => {
     }
   })
 
+  test('stores a direct code without a short link', async () => {
+    const user = await signedInUser()
+    expect(await create('example.com/menu', { kind: 'DIRECT' })).toEqual({ success: true })
+
+    expect(await prisma.qrCode.findFirstOrThrow({ where: { userId: user.id } })).toMatchObject({
+      kind: 'DIRECT',
+      urlHash: null,
+      leadsTo: 'https://example.com/menu',
+    })
+  })
+
+  test('checks a direct code’s destination like a dynamic one', async () => {
+    vi.stubEnv('SAFE_BROWSING_API_KEY', 'key')
+    vi.stubGlobal('fetch', async () => safeBrowsingResponse('https://evil.example/', [1]))
+    await signedInUser()
+
+    expect(await create('https://bit.ly/abc', { kind: 'DIRECT' })).toEqual({
+      error: 'Links through URL shorteners aren’t allowed. Use the final address.',
+    })
+    expect(await create('https://evil.example/', { kind: 'DIRECT' })).toEqual({
+      error: 'This destination is flagged as unsafe, so it can’t be used.',
+    })
+    expect(await prisma.qrCode.count()).toBe(0)
+  })
+
+  test('counts direct codes toward the daily limit', async () => {
+    const user = await signedInUser()
+    for (let i = 0; i < 10; i++) await createDirectQrCode(user.id)
+    expect((await create('example.com'))?.error).toMatch(/^You can create up to 10 QR codes per 24 hours/)
+  })
+
   test('counts only the last 24 hours toward the daily limit', async () => {
     const user = await signedInUser()
     for (let i = 0; i < 10; i++) {
@@ -140,6 +171,42 @@ describe('editing a QR code', () => {
     expect((await prisma.qrCode.findUniqueOrThrow({ where: { id: code.id } })).disabledReason).toBe('MANUAL')
   })
 
+  test('changes a direct code’s note and design but not its destination', async () => {
+    const user = await signedInUser()
+    const code = await createDirectQrCode(user.id, { leadsTo: 'https://example.com/' })
+
+    expect(
+      await updateQrCodeAction(undefined, form({ id: code.id, leadsTo: 'https://example.org/', note: 'Poster' })),
+    ).toEqual({
+      error:
+        'The endpoint of a direct QR code is part of its image, so it can’t be changed. Create a new QR code instead.',
+    })
+
+    const result = await updateQrCodeAction(
+      undefined,
+      form({ id: code.id, leadsTo: 'https://example.com/', note: 'Poster', shape: 'DOTS', kind: 'DYNAMIC' }),
+    )
+    expect(result).toEqual({ success: true })
+    expect(await prisma.qrCode.findUniqueOrThrow({ where: { id: code.id } })).toMatchObject({
+      kind: 'DIRECT',
+      urlHash: null,
+      leadsTo: 'https://example.com/',
+      note: 'Poster',
+      shape: 'DOTS',
+    })
+  })
+
+  test('edits a direct code whose destination later rules would reject', async () => {
+    const user = await signedInUser()
+    const code = await createDirectQrCode(user.id, { leadsTo: 'https://bit.ly/abc' })
+
+    const result = await updateQrCodeAction(
+      undefined,
+      form({ id: code.id, leadsTo: 'https://bit.ly/abc', note: 'Old' }),
+    )
+    expect(result).toEqual({ success: true })
+  })
+
   test('can’t touch another user’s code', async () => {
     const owner = await createUser()
     const code = await createQrCode(owner.id, { leadsTo: 'https://example.com/' })
@@ -166,6 +233,13 @@ describe('deleting a QR code', () => {
     expect(getCachedRedirect(code.urlHash)).toBeUndefined()
   })
 
+  test('removes a direct code', async () => {
+    const user = await signedInUser()
+    const code = await createDirectQrCode(user.id)
+    await deleteQrCodeAction(code.id)
+    expect(await prisma.qrCode.count()).toBe(0)
+  })
+
   test('ignores invalid and unknown ids, and refuses without a session', async () => {
     await signedInUser()
     await deleteQrCodeAction(42)
@@ -174,5 +248,20 @@ describe('deleting a QR code', () => {
     const { clearCookies } = await import('./helpers/request')
     clearCookies()
     await expect(deleteQrCodeAction('missing')).rejects.toThrow('Unauthorized')
+  })
+})
+
+describe('QR code kinds', () => {
+  test('give dynamic codes a short link and direct codes none', async () => {
+    const user = await createUser()
+    const base = { userId: user.id, leadsTo: 'https://example.com/', note: '' }
+
+    await expect(prisma.qrCode.create({ data: { ...base, urlHash: null } })).rejects.toThrow(
+      /QrCode_urlHash_matches_kind/,
+    )
+    await expect(
+      prisma.qrCode.create({ data: { ...base, kind: 'DIRECT', urlHash: 'direct'.padEnd(32, '0') } }),
+    ).rejects.toThrow(/QrCode_urlHash_matches_kind/)
+    expect((await prisma.qrCode.create({ data: { ...base, urlHash: 'dynamic'.padEnd(32, '0') } })).kind).toBe('DYNAMIC')
   })
 })

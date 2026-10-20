@@ -1,5 +1,5 @@
 import { QrDisabledReason } from '../prisma/generated/client'
-import { hashFromInput, notifyOwner, prisma, runOperatorScript } from './operator'
+import { DISABLEABLE, hashFromInput, notifyOwner, prisma, runOperatorScript } from './operator'
 
 // Suspends an account that breaks the Terms of Use, or lifts the suspension.
 
@@ -59,7 +59,7 @@ async function main() {
   const codes = await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: user.id }, data: { suspendedAt: disabledAt } })
     await tx.qrCode.updateMany({
-      where: { userId: user.id, disabledAt: null },
+      where: { userId: user.id, disabledAt: null, ...DISABLEABLE },
       data: { disabledAt, disabledReason: QrDisabledReason.ACCOUNT_SUSPENDED },
     })
     return tx.qrCode.findMany({

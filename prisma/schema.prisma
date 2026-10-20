@@ -67,6 +67,12 @@ enum QrShape {
   DOTS
 }
 
+// Fixed at creation: a printed code can't change how it resolves.
+enum QrKind {
+  DYNAMIC
+  DIRECT
+}
+
 enum QrDisabledReason {
   UNSAFE_DESTINATION
   MANUAL
@@ -76,7 +82,9 @@ enum QrDisabledReason {
 model QrCode {
   id                   String            @id @default(cuid())
   userId               String
-  urlHash              String            @unique @db.VarChar(32)
+  kind                 QrKind            @default(DYNAMIC)
+  // Only dynamic codes have a short link; a CHECK constraint enforces it.
+  urlHash              String?           @unique @db.VarChar(32)
   note                 String
   leadsTo              String
   shape                QrShape           @default(SQUARE)

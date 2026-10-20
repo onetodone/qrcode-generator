@@ -17,6 +17,11 @@ deployed.
   each human hit increments a view counter atomically (bot and preview-crawler
   hits are filtered out). Short links can live on a domain of their own. See
   [Short links](#short-links).
+- **Direct codes** — a code can instead hold its destination in the image
+  itself: it opens without the app, has no short link and no scan count, and
+  is marked "No tracking" on the dashboard. The kind is chosen at creation;
+  a direct code's destination can't be changed later, since printed copies
+  keep the old one.
 - **Smart endpoint detection** — paste a URL, phone number, or email address
   as the destination and it's validated and normalized accordingly.
 - **Multi-user** — each account manages its own set of QR codes; email +
@@ -29,8 +34,9 @@ deployed.
 - **Sign-in providers** — optional sign-up and sign-in with Google, GitHub,
   Microsoft, Facebook, Discord, GitLab or LinkedIn; each one turns on when its
   credentials are set. See [Sign-in providers](#sign-in-providers).
-- **Editable metadata** — update a code's destination, note, or design after
-  creation without regenerating the QR image itself.
+- **Editable metadata** — update a dynamic code's destination, note, or design
+  after creation without regenerating the QR image itself; direct codes keep
+  their destination.
 - **Unsafe destination protection** — destinations are checked against
   Google Safe Browsing when saved and re-checked after scans; flagged codes
   stop redirecting and show a warning page. Destinations behind URL shorteners
@@ -222,7 +228,8 @@ With `SAFE_BROWSING_API_KEY` set, every web destination is looked up in
   code is saved and checked on its next scan.
 - **After scans** — a scan re-checks the destination in the background once
   it is due: hourly during the first week after the destination was set, daily
-  after that. A flagged code is disabled: its `/s/[hash]` link opens
+  after that. Direct codes have no `/s/` link and are checked on save only.
+  A flagged code is disabled: its `/s/[hash]` link opens
   `/link-disabled` instead of the destination and scans aren't counted, and
   the owner gets an email naming the code, the reason and a link to change the
   destination. Saving the code with a safe destination enables it again.
@@ -241,7 +248,8 @@ non-commercial use only; a commercial service needs
 sent to Google as part of the lookup.
 
 Codes reported by other means (for example an abuse email) can be disabled by
-hand. A manual disable survives edits by the owner:
+hand. A manual disable survives edits by the owner. Direct codes can't be
+disabled, since they open their destination without the app:
 
 ```bash
 pnpm qr:disable https://example.com/s/<hash>          # one code (link or bare hash)
@@ -285,7 +293,7 @@ pass or fail every check (`1x00000000000000000000AA` with
 ## Account suspension
 
 An account that breaks the Terms of Use can be suspended by email address, QR
-hash or short link. Its enabled codes stop redirecting, and it can no longer
+hash or short link. Its enabled dynamic codes stop redirecting, and it can no longer
 sign in, create codes or edit them, and the owner gets an email listing the
 codes the suspension disabled. Unsuspending restores those codes; manual
 disables remain in place:

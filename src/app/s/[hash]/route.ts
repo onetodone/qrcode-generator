@@ -42,7 +42,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ hash
     const generation = redirectCacheGeneration()
     const qrCode = await prisma.qrCode.findUnique({
       where: { urlHash: hash },
-      select: { urlHash: true, leadsTo: true, disabledAt: true, destinationSetAt: true, destinationCheckedAt: true },
+      select: { leadsTo: true, disabledAt: true, destinationSetAt: true, destinationCheckedAt: true },
     })
 
     if (!qrCode) {
@@ -53,8 +53,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ hash
     target = { leadsTo: qrCode.leadsTo, disabled: qrCode.disabledAt !== null }
     setCachedRedirect(hash, target, generation)
 
-    if (isRecheckDue(qrCode)) {
-      after(() => recheckDestination(qrCode))
+    const destination = { ...qrCode, urlHash: hash }
+    if (isRecheckDue(destination)) {
+      after(() => recheckDestination(destination))
     }
   }
 

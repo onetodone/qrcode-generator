@@ -7,7 +7,9 @@ import {
   isUrlShortener,
   isValidUri,
   normalizeLeadsTo,
+  qrCodeContent,
 } from '@/lib/qrcode'
+import { qrModules } from '@/lib/qr-matrix'
 
 describe('isValidUri', () => {
   test.each(['https://example.com', 'http://example.com/a?b=c', 'mailto:a@example.com', 'tel:+15551234567'])(
@@ -113,6 +115,32 @@ describe('isOwnRedirectLink', () => {
     expect(isOwnRedirectLink('https://app.example/qrcodes', hosts)).toBe(false)
     expect(isOwnRedirectLink('https://other.example/s/abc', hosts)).toBe(false)
     expect(isOwnRedirectLink('not a url', hosts)).toBe(false)
+  })
+})
+
+describe('qrCodeContent', () => {
+  const leadsTo = 'https://example.com/menu'
+
+  test('is the short link of a dynamic code', () => {
+    expect(qrCodeContent({ kind: 'DYNAMIC', urlHash: 'abc', leadsTo }, 'https://s.example')).toBe(
+      'https://s.example/s/abc',
+    )
+  })
+
+  test('is the endpoint of a direct code', () => {
+    expect(qrCodeContent({ kind: 'DIRECT', urlHash: null, leadsTo }, 'https://s.example')).toBe(leadsTo)
+  })
+})
+
+describe('qrModules', () => {
+  test('encodes characters beyond Latin-1 as UTF-8 instead of their low byte', () => {
+    // "с" (U+0441) and "A" (U+0041) share the low byte 0x41.
+    expect(qrModules('https://пример.рф/с')).not.toEqual(qrModules('https://пример.рф/A'))
+    expect(qrModules('https://example.com/с')).not.toEqual(qrModules('https://example.com/A'))
+  })
+
+  test('fits a 200-character endpoint', () => {
+    expect(qrModules(`https://example.com/${'a'.repeat(180)}`).length).toBeLessThanOrEqual(65)
   })
 })
 

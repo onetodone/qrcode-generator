@@ -12,6 +12,11 @@ export const QR_SHAPE_LABELS: Record<QrShapeValue, string> = {
   DOTS: 'Dots',
 }
 
+/** How a QR code resolves; mirrors the `QrKind` database enum. */
+export const QR_KINDS = ['DYNAMIC', 'DIRECT'] as const
+/** One of `QR_KINDS`. */
+export type QrKindValue = (typeof QR_KINDS)[number]
+
 /** Default module color. */
 export const DEFAULT_FG_COLOR = '#000000'
 /** Default background color. */
@@ -23,9 +28,13 @@ const hexColor = z
   .toLowerCase()
   .regex(/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/, { error: 'Colors must be hex values like #1a2b3c.' })
 
-/** QR code form: endpoint, note and design. Rejects identical foreground and background colors. */
+/**
+ * QR code form: kind, endpoint, note and design. Rejects identical foreground
+ * and background colors. `kind` only counts when a code is created.
+ */
 export const qrCodeFormSchema = z
   .object({
+    kind: z.enum(QR_KINDS).default('DYNAMIC'),
     leadsTo: z
       .string()
       .min(1, { error: 'Endpoint is required.' })
