@@ -39,20 +39,23 @@ export async function createUser(
   })
 }
 
-/** A QR code of `userId` leading to `leadsTo`. */
+/** A dynamic QR code of `userId` leading to `leadsTo`. */
 export async function createQrCode(
   userId: string,
   overrides: Partial<{ leadsTo: string; disabledAt: Date | null; urlHash: string; createdAt: Date }> = {},
 ) {
   counter += 1
+  const { urlHash = `hash${counter}`.padEnd(32, '0'), ...data } = overrides
+  const code = await prisma.qrCode.create({
+    data: { userId, leadsTo: 'https://example.com/', note: 'Flyer', urlHash, ...data },
+  })
+  return { ...code, urlHash }
+}
+
+/** A direct QR code of `userId` leading to `leadsTo`. */
+export async function createDirectQrCode(userId: string, overrides: Partial<{ leadsTo: string }> = {}) {
   return prisma.qrCode.create({
-    data: {
-      userId,
-      leadsTo: 'https://example.com/',
-      note: 'Flyer',
-      urlHash: `hash${counter}`.padEnd(32, '0'),
-      ...overrides,
-    },
+    data: { userId, kind: 'DIRECT', leadsTo: 'https://example.com/', note: 'Sticker', ...overrides },
   })
 }
 

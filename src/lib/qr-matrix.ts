@@ -15,12 +15,14 @@ export const QR_LEVEL = 'Q' as const
 export const QR_MARGIN_MODULES = 4
 
 /**
- * Build the QR module matrix for `value` as a 2D boolean grid (`true` = dark).
+ * Build the QR module matrix for `value`, encoded as UTF-8, as a 2D boolean grid (`true` = dark).
  * Pure and dependency-light — safe to call on the server or the client.
  */
 export function qrModules(value: string): boolean[][] {
   const qr = qrcode(0, QR_LEVEL)
-  qr.addData(value)
+  // The library keeps only the low byte of each character; passing UTF-8
+  // bytes keeps non-ASCII destinations (IDN hosts, paths) intact for scanners.
+  qr.addData(String.fromCharCode(...new TextEncoder().encode(value)), 'Byte')
   qr.make()
 
   const count = qr.getModuleCount()

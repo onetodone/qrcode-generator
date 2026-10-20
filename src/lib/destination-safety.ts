@@ -88,7 +88,11 @@ async function notifyOwner(urlHash: string): Promise<void> {
       where: { urlHash },
       select: { id: true, note: true, urlHash: true, user: { select: { email: true, name: true } } },
     })
-    if (code) await sendCodesDisabledNotice(code.user, QrDisabledReason.UNSAFE_DESTINATION, [code])
+    if (code?.urlHash) {
+      await sendCodesDisabledNotice(code.user, QrDisabledReason.UNSAFE_DESTINATION, [
+        { id: code.id, note: code.note, urlHash: code.urlHash },
+      ])
+    }
   } catch (error) {
     logger.error('qr.disabled_notice_failed', { error, hash: urlHash })
   }

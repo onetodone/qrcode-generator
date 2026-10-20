@@ -19,7 +19,7 @@ export default async function NewQrCodePage() {
 
   return (
     <PageContainer width="3xl">
-      <PageHeader title="New QR Code" description="Create a new tracked QR code." />
+      <PageHeader title="New QR Code" description="Create a QR code with scan tracking, or a direct one without." />
       <QrCodeForm
         action={createQrCodeAction}
         submitLabel="Create QR Code"

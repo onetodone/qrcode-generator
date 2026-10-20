@@ -56,12 +56,17 @@ export default async function PrivacyPolicyPage() {
 
       <h3>Your QR codes</h3>
       <p>
-        For each code: its destination, note, shape and colors, short link, number of scans, when its destination was
-        set and last checked, and whether and why it is disabled.
+        For each code: its type, destination, note, shape and colors, short link, number of scans, when its destination
+        was set and last checked, and whether and why it is disabled. A direct code has no short link and no number of
+        scans.
       </p>
 
       <h3>People who scan a QR code</h3>
-      <p>When someone scans a code or opens its short link, we:</p>
+      <p>
+        A direct code holds its destination in the image itself, so scanning it opens the destination without contacting
+        the Service, and we receive no data about the scan. When someone scans any other code or opens its short link,
+        we:
+      </p>
       <ul>
         <li>receive their IP address and the details of the request, as every website does;</li>
         <li>use the IP address to limit how many requests one address can make per minute, in memory only;</li>
@@ -139,8 +144,8 @@ export default async function PrivacyPolicyPage() {
           <h3>Google Safe Browsing</h3>
           <p>
             To protect people who scan QR codes, we check web destinations with Google Safe Browsing when a code is
-            saved and again after scans. We send Google the destination address only, not who created the code or who
-            scanned it. See{' '}
+            saved and, for codes with a short link, again after scans. We send Google the destination address only, not
+            who created the code or who scanned it. See{' '}
             <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
               Google’s Privacy Policy
             </a>

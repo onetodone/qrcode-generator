@@ -3,7 +3,7 @@ import { isSafeBrowsingEnabled } from '@/lib/safe-browsing'
 import { isCaptchaEnabled } from '@/lib/captcha'
 
 /** Date the Terms of Use and Privacy Policy last changed. */
-export const LEGAL_LAST_UPDATED = new Date('2026-10-11T00:00:00Z')
+export const LEGAL_LAST_UPDATED = new Date('2026-10-20T00:00:00Z')
 
 /**
  * Who runs this instance, how to reach them, and which optional services it

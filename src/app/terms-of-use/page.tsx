@@ -20,7 +20,8 @@ export default async function TermsOfUsePage() {
       <p>
         These Terms of Use (the “Terms”) govern your use of QR Code OneToDone (the “Service”). The Service lets you
         create QR codes that point to short links on this site, sends people who scan a code on to a destination you
-        choose, and counts the scans. The Service is operated by {operatorName ?? UNNAMED_OPERATOR} (“we”, “us”).
+        choose, and counts the scans. It also lets you create direct QR codes that hold the destination itself. The
+        Service is operated by {operatorName ?? UNNAMED_OPERATOR} (“we”, “us”).
       </p>
       <p>
         By creating an account or otherwise using the Service, you agree to these Terms. Our{' '}
@@ -41,10 +42,15 @@ export default async function TermsOfUsePage() {
           notice. This includes limits on how many QR codes you can create or change.
         </li>
         <li>
-          Every QR code points to a short link on this site (<code>/s/…</code>), and the link works only while the
+          A dynamic QR code points to a short link on this site (<code>/s/…</code>), and the link works only while the
           Service runs and the code exists and isn’t disabled. If the Service ends, or a code is deleted or disabled,
           printed copies of the code stop working. Keep this in mind before you print a code or rely on it for anything
           important.
+        </li>
+        <li>
+          A direct QR code holds its destination in the image itself and opens it without the Service. We can’t count
+          its scans, change its destination, or disable it, and printed copies keep working after the code is deleted or
+          the Service ends. You are responsible for every printed copy and where it leads.
         </li>
         <li>
           Scan counts are estimates. We try to leave out bots and link previews, so a count can differ from the number
@@ -129,7 +135,8 @@ export default async function TermsOfUsePage() {
       <ul>
         {safeBrowsing && (
           <li>
-            We check web destinations automatically with Google Safe Browsing when you save them, and again after scans.
+            We check web destinations automatically with Google Safe Browsing when you save them, and for dynamic codes
+            again after scans.
           </li>
         )}
         <li>
@@ -142,8 +149,8 @@ export default async function TermsOfUsePage() {
           risk, or could harm the Service, including the reputation of its domain with browsers and security services.
         </li>
         <li>
-          A disabled QR code leads to a page saying that the link was disabled, instead of its destination, and its
-          scans aren’t counted.
+          A disabled dynamic QR code leads to a page saying that the link was disabled, instead of its destination, and
+          its scans aren’t counted.
         </li>
         <li>If you think we made a mistake, write to us at {support}.</li>
         <li>

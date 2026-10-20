@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient, type QrDisabledReason } from '../prisma/generated/client'
+import { PrismaClient, QrKind, type QrDisabledReason } from '../prisma/generated/client'
 import { sendCodesDisabledNotice, type AccountRecipient, type DisabledCode } from '@/lib/account-emails'
 
 // `DATABASE_URL` from the environment wins over `.env`, so operator scripts can point at production.
@@ -8,6 +8,12 @@ import { sendCodesDisabledNotice, type AccountRecipient, type DisabledCode } fro
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
 
 export const prisma = new PrismaClient({ adapter })
+
+/**
+ * Narrows a code query to dynamic codes. Only they can be disabled: a direct
+ * code opens its endpoint without the app.
+ */
+export const DISABLEABLE = { kind: QrKind.DYNAMIC } as const
 
 /** The hash of a `/s/<hash>` link, or the input itself when it isn't a link. */
 export function hashFromInput(input: string): string {
@@ -33,16 +39,17 @@ export function runOperatorScript(main: () => Promise<void>): void {
 }
 
 /**
- * Emails the owner which codes were disabled and why. A failed send is reported and sets a failing exit
+ * Emails the owner which codes were disabled and why. Codes without a short link are left out. A failed send is reported and sets a failing exit
  * code, but the disable stays in place.
  */
 export async function notifyOwner(
   owner: AccountRecipient,
   reason: QrDisabledReason,
-  codes: DisabledCode[],
+  codes: (Omit<DisabledCode, 'urlHash'> & { urlHash: string | null })[],
 ): Promise<void> {
+  const withShortLinks = codes.flatMap(({ urlHash, ...code }) => (urlHash ? [{ ...code, urlHash }] : []))
   try {
-    await sendCodesDisabledNotice(owner, reason, codes)
+    await sendCodesDisabledNotice(owner, reason, withShortLinks)
     console.log(`Emailed ${owner.email} about the disable.`)
   } catch (error) {
     console.error(`The disable stays in place, but emailing ${owner.email} failed:`, error)

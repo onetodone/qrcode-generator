@@ -6,7 +6,15 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { FormState } from '@/lib/forms'
 import { useActionResult } from '@/hooks/use-action-result'
-import { DEFAULT_BG_COLOR, DEFAULT_FG_COLOR, QR_SHAPES, QR_SHAPE_LABELS, type QrShapeValue } from '@/schemas/qrcode'
+import {
+  DEFAULT_BG_COLOR,
+  DEFAULT_FG_COLOR,
+  QR_KINDS,
+  QR_SHAPES,
+  QR_SHAPE_LABELS,
+  type QrKindValue,
+  type QrShapeValue,
+} from '@/schemas/qrcode'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +34,27 @@ import { QrImage } from '@/components/qrcode/qr-image'
 
 type QrCodeFormAction = (prevState: FormState, formData: FormData) => Promise<FormState>
 
+const KIND_OPTIONS: Record<QrKindValue, { title: string; description: string }> = {
+  DYNAMIC: {
+    title: 'Dynamic',
+    description: 'Opens through a short link. Counts scans, and you can change the endpoint later.',
+  },
+  DIRECT: {
+    title: 'Direct',
+    description:
+      'The endpoint is encoded in the image and opens without this site. No scan count, and the endpoint can’t be changed later.',
+  },
+}
+
+const DIRECT_PREVIEW_PLACEHOLDER = 'https://example.com'
+
+// Close to what the server stores, so the preview has the saved code's module density.
+function directPreviewValue(leadsTo: string): string {
+  const value = leadsTo.trim()
+  if (!value) return DIRECT_PREVIEW_PLACEHOLDER
+  return /^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`
+}
+
 export type QrCodeFormDefaults = {
   leadsTo?: string
   note?: string
@@ -42,6 +71,7 @@ export function QrCodeForm({
   previewValue,
   defaultValues,
   hiddenId,
+  kind: fixedKind,
 }: {
   action: QrCodeFormAction
   submitLabel: string
@@ -50,15 +80,21 @@ export function QrCodeForm({
   previewValue: string
   defaultValues?: QrCodeFormDefaults
   hiddenId?: string
+  /** The kind of an existing code. Without it the form offers the choice. */
+  kind?: QrKindValue
 }) {
   const formId = useId()
   const router = useRouter()
 
+  const [kind, setKind] = useState<QrKindValue>(fixedKind ?? 'DYNAMIC')
   const [leadsTo, setLeadsTo] = useState(defaultValues?.leadsTo ?? '')
   const [note, setNote] = useState(defaultValues?.note ?? '')
   const [shape, setShape] = useState<QrShapeValue>(defaultValues?.shape ?? 'SQUARE')
   const [fgColor, setFgColor] = useState(defaultValues?.fgColor ?? DEFAULT_FG_COLOR)
   const [bgColor, setBgColor] = useState(defaultValues?.bgColor ?? DEFAULT_BG_COLOR)
+
+  const leadsToLocked = fixedKind === 'DIRECT'
+  const qrValue = !fixedKind && kind === 'DIRECT' ? directPreviewValue(leadsTo) : previewValue
 
   const [state, formAction, pending] = useActionState<FormState, FormData>(action, undefined)
 
@@ -76,6 +112,38 @@ export function QrCodeForm({
           <div className="md:col-start-1 md:row-start-1">
             <FieldGroup>
               {hiddenId ? <input type="hidden" name="id" value={hiddenId} /> : null}
+              {fixedKind ? null : (
+                <FieldSet>
+                  <FieldLegend variant="label">Type</FieldLegend>
+                  <div role="radiogroup" aria-label="Type" className="grid gap-2 sm:grid-cols-2">
+                    {QR_KINDS.map((value) => (
+                      <label
+                        key={value}
+                        className={cn(
+                          'cursor-pointer rounded-lg border p-3 text-sm transition-colors',
+                          'has-[:focus-visible]:border-ring has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
+                          kind === value ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted',
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="kind"
+                          value={value}
+                          checked={kind === value}
+                          onChange={() => setKind(value)}
+                          aria-label={KIND_OPTIONS[value].title}
+                          aria-describedby={`${formId}-kind-${value}`}
+                          className="sr-only"
+                        />
+                        <span className="block font-medium text-foreground">{KIND_OPTIONS[value].title}</span>
+                        <span id={`${formId}-kind-${value}`} className="mt-1 block text-muted-foreground">
+                          {KIND_OPTIONS[value].description}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </FieldSet>
+              )}
               <Field>
                 <FieldLabel htmlFor={`${formId}-leadsTo`}>Endpoint</FieldLabel>
                 <FieldContent>
@@ -86,9 +154,15 @@ export function QrCodeForm({
                     maxLength={200}
                     value={leadsTo}
                     onChange={(event) => setLeadsTo(event.target.value)}
+                    readOnly={leadsToLocked}
+                    className={leadsToLocked ? 'bg-muted text-muted-foreground' : undefined}
                     required
                   />
-                  <FieldDescription>URL, phone number, or email address.</FieldDescription>
+                  <FieldDescription>
+                    {leadsToLocked
+                      ? 'Encoded in the image of this direct QR code, so it can’t be changed. Create a new QR code for a different endpoint.'
+                      : 'URL, phone number, or email address.'}
+                  </FieldDescription>
                 </FieldContent>
               </Field>
               <Field>
@@ -159,7 +233,7 @@ export function QrCodeForm({
           <div className="flex flex-col items-center gap-2 md:col-start-2 md:row-start-1 md:w-48">
             <span className="text-sm font-medium text-muted-foreground">Preview</span>
             <div className="rounded-lg border overflow-hidden">
-              <QrImage value={previewValue} shape={shape} fgColor={fgColor} bgColor={bgColor} size={190} />
+              <QrImage value={qrValue} shape={shape} fgColor={fgColor} bgColor={bgColor} size={190} />
             </div>
           </div>
           <div className="mt-4 flex flex-col gap-4 md:col-span-2 md:row-start-2">

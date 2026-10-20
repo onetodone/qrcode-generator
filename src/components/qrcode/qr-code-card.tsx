@@ -3,9 +3,10 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { PencilIcon, Trash2Icon } from 'lucide-react'
-import type { QrShapeValue } from '@/schemas/qrcode'
+import type { QrKindValue, QrShapeValue } from '@/schemas/qrcode'
 import type { QrDisabledReason } from '@/generated/enums'
 import { randomToken } from '@/lib/random'
+import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -31,7 +32,7 @@ const JPEG_QUALITY = 0.95
 
 export type QrCodeCardData = {
   id: string
-  urlHash: string
+  kind: QrKindValue
   note: string
   leadsTo: string
   shape: QrShapeValue
@@ -39,7 +40,8 @@ export type QrCodeCardData = {
   bgColor: string
   views: number
   disabledReason: QrDisabledReason | null
-  redirectUrl: string
+  /** What the image encodes: the short link, or the endpoint of a direct code. */
+  qrContent: string
 }
 
 function triggerDownload(href: string, filename: string) {
@@ -64,6 +66,7 @@ function svgBlob(svg: SVGSVGElement): Blob {
 }
 
 export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
+  const isDirect = qrCode.kind === 'DIRECT'
   const svgRef = useRef<SVGSVGElement>(null)
   const [downloadName] = useState(() => `qrcode-${randomToken(8)}`)
 
@@ -102,7 +105,7 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
       <div className="flex items-start gap-3">
         <QrImage
           ref={svgRef}
-          value={qrCode.redirectUrl}
+          value={qrCode.qrContent}
           shape={qrCode.shape}
           fgColor={qrCode.fgColor}
           bgColor={qrCode.bgColor}
@@ -129,9 +132,18 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
             {qrCode.note || '-'}
           </p>
           <div className="mt-auto flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <p>
-              <strong>{qrCode.views}</strong> {qrCode.views === 1 ? 'scan' : 'scans'}
-            </p>
+            {isDirect ? (
+              <Badge
+                variant="secondary"
+                title="Direct code: opens the endpoint without this site, so scans aren’t counted."
+              >
+                No tracking
+              </Badge>
+            ) : (
+              <p>
+                <strong>{qrCode.views}</strong> {qrCode.views === 1 ? 'scan' : 'scans'}
+              </p>
+            )}
             {qrCode.disabledReason && <QrDisabledBadge reason={qrCode.disabledReason} />}
           </div>
         </div>
@@ -173,8 +185,9 @@ export function QrCodeCard({ qrCode }: { qrCode: QrCodeCardData }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete this QR code?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This permanently removes the code. Anyone who scans it afterwards will get a 404. This can&rsquo;t be
-                  undone.
+                  {isDirect
+                    ? 'This permanently removes the code from your dashboard. Printed copies keep opening the endpoint, since it’s encoded in the image. This can’t be undone.'
+                    : 'This permanently removes the code. Anyone who scans it afterwards will get a 404. This can’t be undone.'}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

@@ -1,13 +1,22 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
-/** Loading placeholder for the QR code create/edit form. */
-export function QrCodeFormSkeleton() {
+/** Loading placeholder for the QR code create/edit form; `withKind` adds the type selector of the create form. */
+export function QrCodeFormSkeleton({ withKind = false }: { withKind?: boolean }) {
   return (
     <Card>
       <CardContent>
         <div className="grid gap-6 md:grid-cols-[1fr_auto]">
           <div className="flex flex-col gap-6 md:col-start-1 md:row-start-1">
+            {withKind && (
+              <div className="flex flex-col gap-3">
+                <Skeleton className="h-4 w-10" />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Skeleton className="h-24 w-full rounded-lg sm:h-36" />
+                  <Skeleton className="h-24 w-full rounded-lg sm:h-36" />
+                </div>
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <Skeleton className="h-4 w-16" />
               <Skeleton className="h-9 w-full" />

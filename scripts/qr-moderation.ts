@@ -1,5 +1,5 @@
 import { QrDisabledReason } from '../prisma/generated/client'
-import { hashFromInput, notifyOwner, prisma, runOperatorScript } from './operator'
+import { DISABLEABLE, hashFromInput, notifyOwner, prisma, runOperatorScript } from './operator'
 
 // Disables or re-enables QR codes by hand, e.g. after an abuse report.
 
@@ -26,7 +26,7 @@ async function main() {
     return
   }
 
-  const scope = flags.includes('--owner') ? { userId: code.userId } : { urlHash: hash }
+  const scope = flags.includes('--owner') ? { userId: code.userId, ...DISABLEABLE } : { urlHash: hash }
   const newlyDisabled =
     command === 'disable'
       ? await prisma.qrCode.findMany({

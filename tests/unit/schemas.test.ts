@@ -81,6 +81,7 @@ describe('qrCodeFormSchema', () => {
 
   test('fills in the default design and normalizes colors', () => {
     expect(qrCodeFormSchema.parse(valid)).toEqual({
+      kind: 'DYNAMIC',
       leadsTo: 'example.com',
       note: 'Flyer',
       shape: 'SQUARE',
@@ -102,5 +103,10 @@ describe('qrCodeFormSchema', () => {
 
   test('rejects an unknown shape', () => {
     expect(qrCodeFormSchema.safeParse({ ...valid, shape: 'STAR' }).success).toBe(false)
+  })
+
+  test('accepts the direct kind and rejects an unknown one', () => {
+    expect(qrCodeFormSchema.parse({ ...valid, kind: 'DIRECT' }).kind).toBe('DIRECT')
+    expect(qrCodeFormSchema.safeParse({ ...valid, kind: 'STATIC' }).success).toBe(false)
   })
 })

@@ -2,6 +2,7 @@ import { phone } from 'phone'
 import * as z from 'zod'
 import { randomToken } from '@/lib/random'
 import { URL_SHORTENER_HOSTS } from '@/lib/url-shorteners'
+import type { QrKindValue } from '@/schemas/qrcode'
 
 const HASH_LENGTH = 32
 
@@ -128,4 +129,15 @@ export function isOwnRedirectLink(leadsTo: string, appHostnames: string[]): bool
 /** Random hash for the `/s/<hash>` redirect link. */
 export function generateUrlHash(): string {
   return randomToken(HASH_LENGTH)
+}
+
+/**
+ * What a code's image encodes: the `/s/<hash>` link of a dynamic code on
+ * `shortLinkBaseUrl`, or the endpoint itself for a direct code.
+ */
+export function qrCodeContent(
+  code: { kind: QrKindValue; urlHash: string | null; leadsTo: string },
+  shortLinkBaseUrl: string,
+): string {
+  return code.kind === 'DIRECT' || !code.urlHash ? code.leadsTo : `${shortLinkBaseUrl}/s/${code.urlHash}`
 }

@@ -243,7 +243,7 @@ export async function deleteAccountAction(_prevState: FormState, formData: FormD
     prisma.user.delete({ where: { id: userId } }),
   ])
   for (const { urlHash } of user.qrCodes) {
-    invalidateRedirect(urlHash)
+    if (urlHash) invalidateRedirect(urlHash)
   }
   logger.info('account.deleted', { userId, qrCodes: user.qrCodes.length })
 
