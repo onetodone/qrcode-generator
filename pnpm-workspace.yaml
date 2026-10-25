@@ -7,5 +7,3 @@ allowBuilds:
 overrides:
   fast-uri: ^3.1.8
   mysql2: ^3.23.1
-minimumReleaseAgeExclude:
-  - lucide-react@1.60.0
