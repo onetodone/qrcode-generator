@@ -1,6 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { PageContainer, PageHeader } from '@/components/page-header'
+import { enabledOAuthProviders } from '@/lib/oauth-providers'
 
 function AccountDetailsSkeleton() {
   return (
@@ -56,14 +57,54 @@ function ChangePasswordSkeleton() {
   )
 }
 
+function ConnectedAccountsSkeleton({ count }: { count: number }) {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-4 w-72" />
+      </CardHeader>
+      <CardContent>
+        <ul className="flex flex-col divide-y">
+          {Array.from({ length: count }, (_, index) => (
+            <li key={index} className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
+              <span className="flex items-center gap-2">
+                <Skeleton className="size-4 rounded-full" />
+                <Skeleton className="h-4 w-24" />
+              </span>
+              <Skeleton className="h-8 w-24" />
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+function DeleteAccountSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-4 w-full max-w-md" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-9 w-32" />
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function ProfileLoading() {
+  const providerCount = enabledOAuthProviders().length
+
   return (
     <PageContainer>
       <PageHeader title="Profile" description="Manage your account details." />
-      <div className="flex flex-col gap-6">
-        <AccountDetailsSkeleton />
-        <ChangePasswordSkeleton />
-      </div>
+      <AccountDetailsSkeleton />
+      <ChangePasswordSkeleton />
+      {providerCount > 0 && <ConnectedAccountsSkeleton count={providerCount} />}
+      <DeleteAccountSkeleton />
     </PageContainer>
   )
 }
