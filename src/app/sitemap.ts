@@ -21,11 +21,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
-      url: `${appUrl}/forgot-password`,
-      changeFrequency: 'yearly',
-      priority: 0.5,
-    },
-    {
       url: `${appUrl}/terms-of-use`,
       changeFrequency: 'yearly',
       priority: 0.3,

@@ -7,6 +7,7 @@ import { EmailLink, LegalPage, UNNAMED_OPERATOR } from '@/components/legal-page'
 export const metadata: Metadata = {
   title: 'Terms of Use',
   description: 'The rules for using QR Code OneToDone: who may use it, what is not allowed, and our responsibilities.',
+  alternates: { canonical: '/terms-of-use' },
 }
 
 export default async function TermsOfUsePage() {
