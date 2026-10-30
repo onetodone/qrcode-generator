@@ -8,6 +8,7 @@ import { EmailLink, LegalPage, UNNAMED_OPERATOR } from '@/components/legal-page'
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description: 'What personal data QR Code OneToDone processes, why, who receives it, and your rights.',
+  alternates: { canonical: '/privacy-policy' },
 }
 
 export default async function PrivacyPolicyPage() {

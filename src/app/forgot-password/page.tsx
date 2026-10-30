@@ -6,6 +6,7 @@ import { ForgotPasswordForm } from './forgot-password-form'
 
 export const metadata: Metadata = {
   title: 'Forgot password',
+  robots: { index: false, follow: true },
 }
 
 export default async function ForgotPasswordPage() {

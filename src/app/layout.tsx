@@ -18,20 +18,23 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+const description =
+  'Free QR code generator with scan tracking: create QR codes for links, phone numbers and email addresses, change where they lead after printing, and see how many times each one is scanned.'
+
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
     default: 'QR Code OneToDone',
     template: '%s | QR Code OneToDone',
   },
-  description: 'Create QR codes with short redirect links and see how many times each one is scanned.',
+  description,
   robots: {
     index: true,
     follow: true,
   },
   openGraph: {
     title: 'QR Code OneToDone',
-    description: 'Create QR codes with short redirect links and see how many times each one is scanned.',
+    description,
     type: 'website',
   },
 }
