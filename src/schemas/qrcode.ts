@@ -17,6 +17,9 @@ export const QR_KINDS = ['DYNAMIC', 'DIRECT'] as const
 /** One of `QR_KINDS`. */
 export type QrKindValue = (typeof QR_KINDS)[number]
 
+/** How many QR codes one account can create per rolling 24 hours. */
+export const DAILY_CREATE_LIMIT = 10
+
 /** Default module color. */
 export const DEFAULT_FG_COLOR = '#000000'
 /** Default background color. */

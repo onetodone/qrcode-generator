@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { Prisma, QrDisabledReason, QrKind } from '@/generated/client'
-import { qrCodeFormSchema, type QrCodeFormInput } from '@/schemas/qrcode'
+import { DAILY_CREATE_LIMIT, qrCodeFormSchema, type QrCodeFormInput } from '@/schemas/qrcode'
 import {
   generateUrlHash,
   hasIpAddressHost,
@@ -22,7 +22,6 @@ import { logger } from '@/lib/logger'
 
 const MAX_HASH_ATTEMPTS = 5
 const HOUR_MS = 60 * 60_000
-const DAILY_CREATE_LIMIT = 10
 // Bounds Safe Browsing lookups per user; creating is capped separately.
 const SAVE_RATE_LIMIT = { limit: 30, windowMs: HOUR_MS }
 
